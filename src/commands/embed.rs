@@ -6,12 +6,13 @@ use ort::{
     session::{Session, builder::GraphOptimizationLevel},
     value::TensorRef,
 };
-use simd_csv::{ByteRecord, Reader};
+use simd_csv::ByteRecord;
 use std::fs::File;
-use std::path::PathBuf;
 use tokenizers::{PaddingDirection, Tokenizer};
 
+use crate::utils::io;
 use crate::utils::pooling;
+use crate::utils::select::SelectedColumns;
 use crate::{CLIResult, CommonArgs};
 
 fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
@@ -25,20 +26,27 @@ fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
 
 #[derive(Args, Debug)]
 pub struct EmbedArgs {
-    path: PathBuf,
+    column: SelectedColumns,
+
+    path: Option<String>,
 
     #[command(flatten)]
     common: CommonArgs,
 }
 
 pub fn action(args: EmbedArgs) -> CLIResult<()> {
-    let mut reader = Reader::from_reader(File::open(args.path)?);
+    let mut reader = io::CSVInput::new(&args.path)
+        .delimiter(args.common.delimiter)
+        .csv_reader()?;
+    let headers = reader.byte_headers()?;
+    let column_index = args.column.single_selection(headers, true)?;
+
     let mut record = ByteRecord::new();
 
     let mut input: Vec<String> = Vec::new();
 
     while reader.read_byte_record(&mut record)? {
-        let string = String::from_utf8(record[0].to_vec()).unwrap();
+        let string = String::from_utf8(record[column_index].to_vec()).unwrap();
         input.push(string);
     }
 
@@ -122,7 +130,13 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         .map(l2_normalize)
         .collect();
 
-    dbg!(normalized);
-
+    let mut writer = io::CSVOutput::new(&None).csv_writer()?;
+    for i in &normalized {
+        let mut record = ByteRecord::new();
+        for f in i {
+            record.push_field(f.to_string().as_bytes());
+        }
+        writer.write_byte_record(&record)?;
+    }
     Ok(())
 }

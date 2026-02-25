@@ -6,9 +6,11 @@ fn print_shape3(last_hidden_state: &ArrayViewD<f32>) {
         (shape[0], shape[1], shape[2])
     };
 
-    println!(
+    dbg!(
         "batch size: {}, seq_len: {}, hidden_dim: {}",
-        batch_size, seq_len, hidden_dim
+        batch_size,
+        seq_len,
+        hidden_dim
     );
 }
 

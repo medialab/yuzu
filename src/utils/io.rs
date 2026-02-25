@@ -142,15 +142,7 @@ impl CSVOutput {
 
     pub fn writer(&self) -> io::Result<BoxedWriter> {
         match &self.path {
-            None => {
-                if io::stdout().is_terminal() {
-                    Err(io::Error::other(
-                        "failed to read CSV data from stdout! Did you forget to give a path to your file?",
-                    ))
-                } else {
-                    Ok(Box::new(io::stdout()))
-                }
-            }
+            None => Ok(Box::new(io::stdout())),
             Some(path) => Ok(Box::new(File::open(path)?)),
         }
     }

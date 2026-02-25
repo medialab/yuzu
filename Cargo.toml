@@ -6,7 +6,7 @@ rust-version = "1.85.1"
 
 [dependencies]
 anyhow = "1.0.100"
-clap = { version = "4.5.51", features = ["derive"] }
+clap = { version = "4.5.51", features = ["color", "derive"] }
 hf-hub = "0.4.3"
 ndarray = "0.16.1"
 ort = "2.0.0-rc.10"

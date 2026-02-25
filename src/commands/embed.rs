@@ -34,6 +34,24 @@ pub struct EmbedArgs {
     common: CommonArgs,
 }
 
+pub struct EmbeddingModel {
+    model_id: String,
+    dim: isize,
+    padding_direction: PaddingDirection,
+    pooling: pooling::Pooling,
+}
+
+impl Default for EmbeddingModel {
+    fn default() -> Self {
+        Self {
+            model_id: "ibm-granite/granite-embedding-107m-multilingual".to_string(),
+            dim: 384,
+            padding_direction: PaddingDirection::Left,
+            pooling: pooling::Pooling::Cls,
+        }
+    }
+}
+
 pub fn action(args: EmbedArgs) -> CLIResult<()> {
     let mut reader = io::CSVInput::new(&args.path)
         .delimiter(args.common.delimiter)
@@ -122,7 +140,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
     let attention_mask = a_mask.try_extract_array::<i64>().unwrap();
     let pooled_embeddings: Array2<f32> = match model_type {
         Some("qwen3") => pooling::last_token(&last_hidden_state),
-        _ => pooling::mean_pooling(&last_hidden_state, &attention_mask),
+        _ => pooling::mean_pooling(&last_hidden_state, Some(&attention_mask)),
     };
 
     let normalized: Vec<Vec<f32>> = pooled_embeddings

@@ -5,11 +5,13 @@ use ort::{
     session::{Session, builder::GraphOptimizationLevel},
     value::TensorRef,
 };
+use simd_csv::{ByteRecord, Reader};
 use std::fs::File;
 use std::path::PathBuf;
 use tokenizers::{PaddingDirection, PaddingParams, Tokenizer};
 
 use crate::utils::pooling;
+use crate::utils::select::SelectedColumns;
 
 fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
     let norm = vec.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -20,12 +22,19 @@ fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
     }
 }
 
-pub fn qwen3_embed(_input: &PathBuf) {
+pub fn qwen3_embed(input: &PathBuf) {
     let input = vec![
         "Il fait un temps merveilleux.",
         "Le soleil brille dehors!",
         "Il a préparé le repas en un tour de main.",
     ];
+
+    // let mut reader = Reader::from_reader(File::open(input).unwrap());
+    // let mut record = ByteRecord::new();
+    // while reader.read_byte_record(&mut record).unwrap() {
+
+    //     dbg!(record[0]);
+    // }
 
     let api = Api::new().unwrap();
     let repo = api.model("medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX".to_string());

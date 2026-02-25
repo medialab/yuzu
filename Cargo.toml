@@ -2,6 +2,22 @@
 name = "yuzu"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85.1"
 
 [dependencies]
+anyhow = "1.0.100"
 clap = { version = "4.5.51", features = ["derive"] }
+hf-hub = "0.4.3"
+ndarray = "0.16.1"
+ort = "2.0.0-rc.10"
+serde = { version = "1", features = ["rc"] }
+serde_derive = "1"
+serde_json = "1.0"
+simd-csv = "0.10.2"
+tokenizers = "0.22.1"
+
+[[bin]]
+name = "yuzu"
+test = true
+bench = false
+doctest = false

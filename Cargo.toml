@@ -1,16 +1,22 @@
 [package]
 name = "yuzu"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 edition = "2024"
 autotests = false
 rust-version = "1.85.1"
-licence = "GPL-3.0"
+license = "GPL-3.0"
 description = "Use language models from the command line"
 repository = "https://github.com/medialab/yuzu"
 homepage = "https://github.com/medialab/yuzu"
 authors = [
   "Béatrice Mazoyer <beatrice.mazoyer@sciencespo.fr>",
   "Guillaume Plique <guillaume.plique@sciencespo.fr>",
+]
+include = [
+  "Cargo.toml",
+  "README.md",
+  "LICENSE",
+  "src/**/*.rs",
 ]
 
 [[bin]]

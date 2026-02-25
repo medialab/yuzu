@@ -1,5 +1,6 @@
 use clap::Args;
 use simd_csv::ByteRecord;
+use whichlang::detect_language;
 
 use crate::utils::io::{CSVInput, CSVOutput};
 use crate::utils::select::SelectedColumns;
@@ -34,8 +35,10 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
     let mut record = ByteRecord::new();
 
     while reader.read_byte_record(&mut record)? {
-        let _text = &record[column_index];
-        record.push_field(b"en");
+        let text = &record[column_index];
+        let lang = detect_language(std::str::from_utf8(text).expect("Could not decode utf-8!"));
+
+        record.push_field(lang.three_letter_code().as_bytes());
         writer.write_byte_record(&record)?;
     }
 

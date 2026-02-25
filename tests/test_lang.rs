@@ -8,6 +8,6 @@ fn lang() {
         .write_csv_stdin(&[&["sentence"], &["this is an English sentence"]])
         .assert_csv(&[
             &["sentence", "lang"],
-            &["this is an English sentence", "en"],
+            &["this is an English sentence", "eng"],
         ]);
 }

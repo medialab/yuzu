@@ -1,15 +1,12 @@
 // Copied from https://github.com/medialab/xan/blob/5a73097bb85761c6187404f02f9031388af5eafd/src/select.rs
-use serde::Deserialize;
 use std::borrow::ToOwned;
 use std::cmp::Ordering;
-use std::convert::TryFrom;
 use std::fmt;
 use std::iter::repeat;
 use std::ops;
 use std::str::FromStr;
 
-#[derive(Clone, Deserialize)]
-#[serde(try_from = "String")]
+#[derive(Clone)]
 pub struct SelectedColumns {
     selectors: Vec<Selector>,
     invert: bool,
@@ -136,11 +133,11 @@ impl fmt::Debug for SelectedColumns {
     }
 }
 
-impl TryFrom<String> for SelectedColumns {
-    type Error = String;
+impl FromStr for SelectedColumns {
+    type Err = String;
 
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::parse(&value)
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse(s)
     }
 }
 

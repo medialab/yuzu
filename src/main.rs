@@ -10,6 +10,12 @@ pub enum CLIError {
     Custom(String),
 }
 
+impl From<String> for CLIError {
+    fn from(value: String) -> Self {
+        Self::Custom(value)
+    }
+}
+
 impl From<io::Error> for CLIError {
     fn from(value: io::Error) -> Self {
         Self::Custom(value.to_string())
@@ -33,6 +39,8 @@ struct YuzuArgs {
 
 #[derive(Args, Debug)]
 pub struct CommonArgs {
+    /// The field delimiter for reading CSV data. Must be a single character.
+    /// Will default to a comma.
     #[arg(short, long)]
     delimiter: Option<String>,
 }

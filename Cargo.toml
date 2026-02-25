@@ -3,6 +3,10 @@ name = "yuzu"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85.1"
+authors = [
+  "Béatrice Mazoyer <beatrice.mazoyer@sciencespo.fr>",
+  "Guillaume Plique <guillaume.plique@sciencespo.fr>",
+]
 
 [[bin]]
 name = "yuzu"

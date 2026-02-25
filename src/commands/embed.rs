@@ -9,10 +9,9 @@ use ort::{
 use simd_csv::{ByteRecord, Reader};
 use std::fs::File;
 use std::path::PathBuf;
-use tokenizers::{PaddingDirection, PaddingParams, Tokenizer};
+use tokenizers::{PaddingDirection, Tokenizer};
 
 use crate::utils::pooling;
-use crate::utils::select::SelectedColumns;
 use crate::{CLIResult, CommonArgs};
 
 fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
@@ -58,10 +57,12 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         .expect("file should have model_type key")
         .as_str();
 
-    let mut padding = PaddingParams::default();
-    padding.direction = match model_type {
-        Some("qwen3") => PaddingDirection::Left,
-        _ => PaddingDirection::Right,
+    let padding = tokenizers::PaddingParams {
+        direction: match model_type {
+            Some("qwen3") => PaddingDirection::Left,
+            _ => PaddingDirection::Right,
+        },
+        ..Default::default()
     };
     let mut tokenizer = Tokenizer::from_file(vectorizer_file).unwrap();
     tokenizer.with_padding(Some(padding));
@@ -118,7 +119,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
 
     let normalized: Vec<Vec<f32>> = pooled_embeddings
         .axis_iter(Axis(0))
-        .map(|v| l2_normalize(v))
+        .map(l2_normalize)
         .collect();
 
     dbg!(normalized);

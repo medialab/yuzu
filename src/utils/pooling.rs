@@ -39,7 +39,6 @@ pub fn last_token(last_hidden_state: &ArrayViewD<f32>) -> Array2<f32> {
 
     let token_embeddings = last_hidden_state.slice(s![.., .., ..]);
     let sliced = token_embeddings.slice(s![.., -1, ..]);
-    let last_token = sliced.to_owned().into_dimensionality::<Ix2>().unwrap();
 
-    last_token
+    sliced.to_owned().into_dimensionality::<Ix2>().unwrap()
 }

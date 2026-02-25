@@ -2,6 +2,7 @@
 name = "yuzu"
 version = "0.1.0"
 edition = "2024"
+autotests = false
 rust-version = "1.85.1"
 authors = [
   "Béatrice Mazoyer <beatrice.mazoyer@sciencespo.fr>",
@@ -10,9 +11,12 @@ authors = [
 
 [[bin]]
 name = "yuzu"
-test = true
+test = false
 bench = false
 doctest = false
+
+[[test]]
+name = "tests"
 
 [profile.release]
 codegen-units = 1
@@ -42,3 +46,6 @@ serde_derive = "1"
 serde_json = "1.0"
 simd-csv = "0.10.2"
 tokenizers = "0.22.1"
+
+[dev-dependencies]
+assert_cmd = "2.1.2"

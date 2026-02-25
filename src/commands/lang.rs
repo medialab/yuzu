@@ -1,13 +1,11 @@
 use clap::Args;
 
-use crate::CLIResult;
-use crate::CommonArgs;
-
+use crate::{CLIResult, CommonArgs};
 
 #[derive(Args, Debug)]
 pub struct LangArgs {
     #[command(flatten)]
-    common: CommonArgs
+    common: CommonArgs,
 }
 
 pub fn action(args: LangArgs) -> CLIResult<()> {

@@ -1,20 +1,18 @@
-use crate::commands::embed::qwen3_embed;
-use clap::{Parser, Subcommand, Args};
-use std::path::PathBuf;
+use clap::{Args, Parser, Subcommand};
 
 pub mod commands;
 pub mod utils;
 
 #[derive(Debug)]
 pub enum CLIError {
-    Custom(String)
+    Custom(String),
 }
 
 pub type CLIResult<T> = Result<T, CLIError>;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
-struct Cli {
+struct YuzuArgs {
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -22,21 +20,29 @@ struct Cli {
 #[derive(Args, Debug)]
 pub struct CommonArgs {
     #[arg(short, long)]
-    delimiter: Option<String>
+    delimiter: Option<String>,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    Embed { input: PathBuf },
-    Lang(commands::lang::LangArgs)
+    Embed(commands::embed::EmbedArgs),
+    Lang(commands::lang::LangArgs),
 }
 
 fn main() {
-    let cli = Cli::parse();
+    let args = YuzuArgs::parse();
 
-    match cli.command {
-        Some(Commands::Embed { input }) => qwen3_embed(&input),
-        Some(Commands::Lang(args)) => commands::lang::action(args).unwrap(),
-        None => {}
+    let result = match args.command {
+        Some(Commands::Embed(args)) => commands::embed::action(args),
+        Some(Commands::Lang(args)) => commands::lang::action(args),
+        None => Ok(()),
+    };
+
+    if let Err(error) = result {
+        match error {
+            CLIError::Custom(msg) => {
+                eprintln!("{}", msg);
+            }
+        }
     }
 }

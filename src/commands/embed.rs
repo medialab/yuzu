@@ -1,3 +1,4 @@
+use clap::Args;
 use hf_hub::api::sync::Api;
 use ndarray::{Array2, ArrayView1, Axis};
 use ort::{
@@ -12,6 +13,7 @@ use tokenizers::{PaddingDirection, PaddingParams, Tokenizer};
 
 use crate::utils::pooling;
 use crate::utils::select::SelectedColumns;
+use crate::{CLIResult, CommonArgs};
 
 fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
     let norm = vec.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -22,7 +24,15 @@ fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
     }
 }
 
-pub fn qwen3_embed(input: &PathBuf) {
+#[derive(Args, Debug)]
+pub struct EmbedArgs {
+    path: PathBuf,
+
+    #[command(flatten)]
+    common: CommonArgs,
+}
+
+pub fn action(args: EmbedArgs) -> CLIResult<()> {
     let input = vec![
         "Il fait un temps merveilleux.",
         "Le soleil brille dehors!",
@@ -113,4 +123,6 @@ pub fn qwen3_embed(input: &PathBuf) {
         .axis_iter(Axis(0))
         .map(|v| l2_normalize(v))
         .collect();
+
+    Ok(())
 }

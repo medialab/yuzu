@@ -33,18 +33,15 @@ pub struct EmbedArgs {
 }
 
 pub fn action(args: EmbedArgs) -> CLIResult<()> {
-    let input = vec![
-        "Il fait un temps merveilleux.",
-        "Le soleil brille dehors!",
-        "Il a préparé le repas en un tour de main.",
-    ];
+    let mut reader = Reader::from_reader(File::open(args.path)?);
+    let mut record = ByteRecord::new();
 
-    // let mut reader = Reader::from_reader(File::open(input).unwrap());
-    // let mut record = ByteRecord::new();
-    // while reader.read_byte_record(&mut record).unwrap() {
+    let mut input: Vec<String> = Vec::new();
 
-    //     dbg!(record[0]);
-    // }
+    while reader.read_byte_record(&mut record)? {
+        let string = String::from_utf8(record[0].to_vec()).unwrap();
+        input.push(string);
+    }
 
     let api = Api::new().unwrap();
     let repo = api.model("medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX".to_string());
@@ -119,10 +116,12 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         _ => pooling::mean_pooling(&last_hidden_state, &attention_mask),
     };
 
-    let _normalized: Vec<Vec<f32>> = pooled_embeddings
+    let normalized: Vec<Vec<f32>> = pooled_embeddings
         .axis_iter(Axis(0))
         .map(|v| l2_normalize(v))
         .collect();
+
+    dbg!(normalized);
 
     Ok(())
 }

@@ -1,3 +1,5 @@
+use std::io;
+
 use clap::{Args, Parser, Subcommand};
 
 pub mod commands;
@@ -6,6 +8,18 @@ pub mod utils;
 #[derive(Debug)]
 pub enum CLIError {
     Custom(String),
+}
+
+impl From<io::Error> for CLIError {
+    fn from(value: io::Error) -> Self {
+        Self::Custom(value.to_string())
+    }
+}
+
+impl From<simd_csv::Error> for CLIError {
+    fn from(value: simd_csv::Error) -> Self {
+        Self::Custom(value.to_string())
+    }
 }
 
 pub type CLIResult<T> = Result<T, CLIError>;

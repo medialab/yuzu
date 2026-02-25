@@ -1,9 +1,50 @@
 use std::fs::File;
 use std::io::{self, IsTerminal, Read, Write};
 use std::path::PathBuf;
+use std::str::FromStr;
 
 pub type BoxedReader = Box<dyn Read + Send + 'static>;
 pub type BoxedWriter = Box<dyn Write + Send + 'static>;
+
+#[derive(Clone, Copy, Debug)]
+pub struct Delimiter(u8);
+
+impl Delimiter {
+    pub fn as_byte(self) -> u8 {
+        self.0
+    }
+}
+
+impl FromStr for Delimiter {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            r"\t" => Ok(Delimiter(b'\t')),
+            s => {
+                if s.len() != 1 {
+                    let msg = format!(
+                        "Could not convert '{}' to a single \
+                                       ASCII character.",
+                        s
+                    );
+                    return Err(msg);
+                }
+                let c = s.chars().next().unwrap();
+                if c.is_ascii() {
+                    Ok(Delimiter(c as u8))
+                } else {
+                    let msg = format!(
+                        "Could not convert '{}' \
+                                       to ASCII delimiter.",
+                        c
+                    );
+                    Err(msg)
+                }
+            }
+        }
+    }
+}
 
 pub struct CSVInput {
     path: Option<PathBuf>,
@@ -32,8 +73,11 @@ impl CSVInput {
         input
     }
 
-    pub fn delimiter(mut self, delimiter: u8) -> Self {
-        self.delimiter = delimiter;
+    pub fn delimiter(mut self, delimiter: Option<Delimiter>) -> Self {
+        self.delimiter = match delimiter {
+            None => b',',
+            Some(d) => d.as_byte(),
+        };
         self
     }
 

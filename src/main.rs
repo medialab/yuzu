@@ -42,7 +42,7 @@ pub struct CommonArgs {
     /// The field delimiter for reading CSV data. Must be a single character.
     /// Will default to a comma.
     #[arg(short, long)]
-    delimiter: Option<String>,
+    delimiter: Option<utils::io::Delimiter>,
 }
 
 #[derive(Subcommand)]

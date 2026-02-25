@@ -16,7 +16,9 @@ pub struct LangArgs {
 }
 
 pub fn action(args: LangArgs) -> CLIResult<()> {
-    let mut reader = CSVInput::new(&args.input).csv_reader()?;
+    let mut reader = CSVInput::new(&args.input)
+        .delimiter(args.common.delimiter)
+        .csv_reader()?;
     let headers = reader.byte_headers()?;
     let column_index = args.column.single_selection(headers, true)?;
 

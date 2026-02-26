@@ -48,6 +48,7 @@ lto = false
 [dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.51", features = ["color", "derive"] }
+flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
 hf-hub = "0.4.3"
 ndarray = "0.16.1"
 ort = "2.0.0-rc.10"
@@ -57,6 +58,7 @@ serde_json = "1.0"
 simd-csv = "0.10.2"
 tokenizers = "0.22.1"
 whichlang = "0.1.1"
+zstd = "0.13.3"
 
 [dev-dependencies]
 assert_cmd = "2.1.2"

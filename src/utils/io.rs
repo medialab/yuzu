@@ -46,9 +46,28 @@ impl FromStr for Delimiter {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum Compression {
+    Gzip,
+    Zstd,
+}
+
+impl Compression {
+    fn infer_from_path(path: &str) -> Option<Self> {
+        if path.ends_with(".gz") {
+            Some(Self::Gzip)
+        } else if path.ends_with(".zst") {
+            Some(Self::Zstd)
+        } else {
+            None
+        }
+    }
+}
+
 pub struct CSVInput {
     path: Option<PathBuf>,
     delimiter: u8,
+    compression: Option<Compression>,
 }
 
 impl Default for CSVInput {
@@ -56,6 +75,7 @@ impl Default for CSVInput {
         Self {
             path: None,
             delimiter: b',',
+            compression: None,
         }
     }
 }
@@ -66,7 +86,8 @@ impl CSVInput {
 
         if let Some(path) = path_opt {
             if path != "-" {
-                input.path = Some(PathBuf::from(path))
+                input.path = Some(PathBuf::from(path));
+                input.compression = Compression::infer_from_path(path);
             }
         }
 
@@ -92,7 +113,17 @@ impl CSVInput {
                     Ok(Box::new(io::stdin()))
                 }
             }
-            Some(path) => Ok(Box::new(File::open(path)?)),
+            Some(path) => {
+                let file = File::open(path)?;
+
+                match self.compression {
+                    None => Ok(Box::new(file)),
+                    Some(compression) => match compression {
+                        Compression::Gzip => Ok(Box::new(flate2::read::MultiGzDecoder::new(file))),
+                        Compression::Zstd => Ok(Box::new(zstd::Decoder::new(file)?)),
+                    },
+                }
+            }
         }
     }
 

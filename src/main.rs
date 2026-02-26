@@ -1,4 +1,5 @@
 use std::io;
+use std::process;
 
 use clap::{Args, Parser, Subcommand};
 
@@ -7,6 +8,7 @@ pub mod utils;
 
 #[derive(Debug)]
 pub enum CLIError {
+    Io(io::Error),
     Custom(String),
 }
 
@@ -18,13 +20,20 @@ impl From<String> for CLIError {
 
 impl From<io::Error> for CLIError {
     fn from(value: io::Error) -> Self {
-        Self::Custom(value.to_string())
+        Self::Io(value)
     }
 }
 
 impl From<simd_csv::Error> for CLIError {
     fn from(value: simd_csv::Error) -> Self {
-        Self::Custom(value.to_string())
+        if !value.is_io_error() {
+            Self::Custom(value.to_string())
+        } else {
+            match value.into_kind() {
+                simd_csv::ErrorKind::Io(inner) => Self::Io(inner),
+                _ => unreachable!(),
+            }
+        }
     }
 }
 
@@ -64,6 +73,14 @@ fn main() {
         match error {
             CLIError::Custom(msg) => {
                 eprintln!("{}", msg);
+                process::exit(1);
+            }
+            CLIError::Io(err) if err.kind() == io::ErrorKind::BrokenPipe => {
+                process::exit(0);
+            }
+            CLIError::Io(err) => {
+                eprintln!("{}", err);
+                process::exit(1);
             }
         }
     }

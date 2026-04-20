@@ -1256,7 +1256,7 @@ dependencies = [
 [[package]]
 name = "npyz"
 version = "0.9.0"
-source = "git+https://github.com/medialab/npyz#361c892a96690fab9cf705ded2c26599425da12e"
+source = "git+https://github.com/medialab/npyz?rev=361c892a#361c892a96690fab9cf705ded2c26599425da12e"
 dependencies = [
  "byteorder",
  "num-bigint",
@@ -2609,8 +2609,7 @@ dependencies = [
 [[package]]
 name = "whichlang"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b9aa3ad29c3d08283ac6b769e3ec15ad1ddb88af7d2e9bc402c574973b937e7"
+source = "git+https://github.com/medialab/whichlang?rev=92591fa2#92591fa27d9845c1c7239135b69a1f1d4d117200"
 
 [[package]]
 name = "winapi"

@@ -1,5 +1,6 @@
 use std::io;
 use std::process;
+use std::str::Utf8Error;
 
 use clap::{Args, Parser, Subcommand};
 
@@ -21,6 +22,12 @@ impl From<String> for CLIError {
 impl From<io::Error> for CLIError {
     fn from(value: io::Error) -> Self {
         Self::Io(value)
+    }
+}
+
+impl From<Utf8Error> for CLIError {
+    fn from(value: Utf8Error) -> Self {
+        Self::Custom(value.to_string())
     }
 }
 

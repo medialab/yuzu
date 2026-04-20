@@ -1,3 +1,5 @@
+use std::str::from_utf8;
+
 use clap::Args;
 use simd_csv::ByteRecord;
 use whichlang::detect_language;
@@ -12,6 +14,9 @@ pub struct LangArgs {
     column: SelectedColumns,
     /// Path to CSV file containing text to classify (will use stdin if not given or if path is "-").
     input: Option<String>,
+    /// Whether to emit full English name of detected lang instead of ISO-639-3 code.
+    #[arg(long)]
+    full_name: bool,
     /// Path to output file. Will write to stdout if not given or if path is "-".
     #[arg(short, long)]
     output: Option<String>,
@@ -23,6 +28,7 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
     let mut reader = Input::new(&args.input)
         .delimiter(args.common.delimiter)
         .csv_reader()?;
+
     let mut headers = reader.byte_headers()?.clone();
     let column_index = args.column.single_selection(&headers, true)?;
 
@@ -36,9 +42,19 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
 
     while reader.read_byte_record(&mut record)? {
         let text = &record[column_index];
-        let lang = detect_language(std::str::from_utf8(text).expect("Could not decode utf-8!"));
+        let lang_opt = detect_language(from_utf8(text)?);
 
-        record.push_field(lang.three_letter_code().as_bytes());
+        let cell = if let Some(lang) = lang_opt {
+            if args.full_name {
+                lang.eng_name()
+            } else {
+                lang.three_letter_code()
+            }
+        } else {
+            ""
+        };
+
+        record.push_field(cell.as_bytes());
         writer.write_byte_record(&record)?;
     }
 

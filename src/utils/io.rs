@@ -1,12 +1,18 @@
 use std::fs::File;
-use std::io::{self, BufWriter, IsTerminal, Read, Write};
+use std::io::{self, BufWriter, IsTerminal, Read, Seek, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use npyz::WriterBuilder;
+
 const DEFAULT_BUFFERED_WRITER_CAPACITY: usize = 32 * (1 << 10);
+
+pub trait SeekWrite: Seek + Write {}
+impl<T: Seek + Write> SeekWrite for T {}
 
 pub type BoxedReader = Box<dyn Read + Send + 'static>;
 pub type BoxedWriter = Box<dyn Write + Send + 'static>;
+pub type BoxedSeekableWriter = Box<dyn SeekWrite + Send + 'static>;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Delimiter(u8);
@@ -180,10 +186,24 @@ impl Output {
         }
     }
 
+    pub fn seekable_writer(&self) -> io::Result<BoxedSeekableWriter> {
+        match &self.path {
+            None => Err(io::Error::other("cannot seek output")),
+            Some(path) => Ok(Box::new(File::open(path)?)),
+        }
+    }
+
     pub fn buf_writer(&self) -> io::Result<BufWriter<BoxedWriter>> {
         Ok(BufWriter::with_capacity(
             DEFAULT_BUFFERED_WRITER_CAPACITY,
             self.writer()?,
+        ))
+    }
+
+    pub fn seekable_buf_writer(&self) -> io::Result<BufWriter<BoxedSeekableWriter>> {
+        Ok(BufWriter::with_capacity(
+            DEFAULT_BUFFERED_WRITER_CAPACITY,
+            self.seekable_writer()?,
         ))
     }
 
@@ -201,5 +221,17 @@ impl Output {
 
     pub fn csv_writer(&self) -> io::Result<simd_csv::Writer<BoxedWriter>> {
         Ok(self.csv_writer_from_writer(self.writer()?))
+    }
+
+    pub fn npy_f32_writer(
+        &self,
+        dimensions: u64,
+    ) -> io::Result<npyz::NpyWriter<f32, BufWriter<BoxedSeekableWriter>>> {
+        let buf_writer = self.seekable_buf_writer()?;
+
+        npyz::WriteOptions::new()
+            .default_dtype()
+            .writer(buf_writer)
+            .begin_2d(dimensions)
     }
 }

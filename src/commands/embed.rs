@@ -40,7 +40,7 @@ pub struct EmbedArgs {
 }
 
 pub fn action(args: EmbedArgs) -> CLIResult<()> {
-    let mut reader = io::Input::new(&args.path)
+    let mut reader = io::Input::new(&args.input)
         .delimiter(args.common.delimiter)
         .csv_reader()?;
     let headers = reader.byte_headers()?;

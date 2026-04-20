@@ -33,6 +33,7 @@ pub struct LangArgs {
 pub fn action(args: LangArgs) -> CLIResult<()> {
     let mut reader = Input::new(&args.input)
         .delimiter(args.common.delimiter)
+        .no_headers(args.common.no_headers)
         .csv_reader()?;
 
     let mut headers = reader.byte_headers()?.clone();
@@ -40,9 +41,10 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
 
     let mut writer = Output::new(&args.output).csv_writer()?;
 
-    headers.push_field(args.lang_column.as_bytes());
-
-    writer.write_byte_record(&headers)?;
+    if reader.has_headers() {
+        headers.push_field(args.lang_column.as_bytes());
+        writer.write_byte_record(&headers)?;
+    }
 
     let mut record = ByteRecord::new();
 

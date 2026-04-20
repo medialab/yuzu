@@ -39,7 +39,7 @@ impl<T: npyz::Serialize + ToString, W: Write> VectorWriter<T, W> {
                     record.push_field(x.to_string().as_bytes());
                 }
 
-                writer.write_byte_record(&record)?;
+                writer.write_byte_record(record)?;
 
                 Ok(())
             }

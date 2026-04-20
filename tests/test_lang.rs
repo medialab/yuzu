@@ -18,6 +18,22 @@ fn lang() {
 }
 
 #[test]
+fn lang_no_headers() {
+    cmd()
+        .arg("lang")
+        .arg("0")
+        .arg("-n")
+        .write_csv_stdin(&[
+            &["this is an English sentence"],
+            &["cette phrase est en français"],
+        ])
+        .assert_csv(&[
+            &["this is an English sentence", "eng"],
+            &["cette phrase est en français", "fra"],
+        ]);
+}
+
+#[test]
 fn lang_full_name() {
     cmd()
         .arg("lang")

@@ -55,6 +55,9 @@ struct YuzuArgs {
 
 #[derive(Args, Debug)]
 pub struct CommonArgs {
+    /// When set, first row of CSV input will not be interpreted as a header.
+    #[arg(short, long)]
+    no_headers: bool,
     /// The field delimiter for reading CSV data. Must be a single character.
     /// Will default to a comma.
     #[arg(short, long)]

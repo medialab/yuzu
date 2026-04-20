@@ -76,6 +76,7 @@ pub struct Input {
     path: Option<PathBuf>,
     delimiter: u8,
     compression: Option<Compression>,
+    no_headers: bool,
 }
 
 impl Default for Input {
@@ -84,6 +85,7 @@ impl Default for Input {
             path: None,
             delimiter: b',',
             compression: None,
+            no_headers: false,
         }
     }
 }
@@ -107,6 +109,11 @@ impl Input {
             None => b',',
             Some(d) => d.as_byte(),
         };
+        self
+    }
+
+    pub fn no_headers(mut self, yes: bool) -> Self {
+        self.no_headers = yes;
         self
     }
 
@@ -138,7 +145,9 @@ impl Input {
     fn csv_reader_builder(&self) -> simd_csv::ReaderBuilder {
         let mut builder = simd_csv::ReaderBuilder::new();
 
-        builder.delimiter(self.delimiter);
+        builder
+            .delimiter(self.delimiter)
+            .has_headers(!self.no_headers);
 
         builder
     }

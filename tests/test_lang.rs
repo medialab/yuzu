@@ -52,3 +52,17 @@ fn lang_lang_column() {
             &["cette phrase est en français", "fra"],
         ]);
 }
+
+#[test]
+fn lang_default() {
+    cmd()
+        .arg("lang")
+        .arg("sentence")
+        .args(["--default", "und"])
+        .write_csv_stdin(&[&["sentence"], &["this is an English sentence"], &[""]])
+        .assert_csv(&[
+            &["sentence", "lang"],
+            &["this is an English sentence", "eng"],
+            &["", "und"],
+        ]);
+}

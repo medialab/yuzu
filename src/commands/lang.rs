@@ -20,6 +20,9 @@ pub struct LangArgs {
     /// Name of the added column containing detected lang.
     #[arg(long, default_value = "lang")]
     lang_column: String,
+    /// Default value to use when lang cannot be detected.
+    #[arg(long, default_value = "")]
+    default: String,
     /// Path to output file. Will write to stdout if not given or if path is "-".
     #[arg(short, long)]
     output: Option<String>,
@@ -54,7 +57,7 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
                 lang.three_letter_code()
             }
         } else {
-            ""
+            &args.default
         };
 
         record.push_field(cell.as_bytes());

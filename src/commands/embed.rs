@@ -1,5 +1,4 @@
 use clap::Args;
-use hf_hub::api::sync::Api;
 use ndarray::{Array2, ArrayView1, Axis};
 use ort::{
     execution_providers::CPUExecutionProvider,
@@ -10,6 +9,8 @@ use simd_csv::ByteRecord;
 use std::fs::File;
 use tokenizers::{PaddingDirection, Tokenizer};
 
+use crate::utils::hf::EmbeddingModel;
+use crate::utils::hf::get_model_files;
 use crate::utils::io;
 use crate::utils::pooling;
 use crate::utils::select::SelectedColumns;
@@ -28,28 +29,14 @@ fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
 pub struct EmbedArgs {
     column: SelectedColumns,
 
-    path: Option<String>,
+    /// Path to CSV file containing text to classify (will use stdin if not given or if path is "-").
+    input: Option<String>,
+
+    #[arg(short, long)]
+    model: Option<EmbeddingModel>,
 
     #[command(flatten)]
     common: CommonArgs,
-}
-
-pub struct EmbeddingModel {
-    model_id: String,
-    dim: isize,
-    padding_direction: PaddingDirection,
-    pooling: pooling::Pooling,
-}
-
-impl Default for EmbeddingModel {
-    fn default() -> Self {
-        Self {
-            model_id: "ibm-granite/granite-embedding-107m-multilingual".to_string(),
-            dim: 384,
-            padding_direction: PaddingDirection::Left,
-            pooling: pooling::Pooling::Cls,
-        }
-    }
 }
 
 pub fn action(args: EmbedArgs) -> CLIResult<()> {
@@ -68,14 +55,14 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         input.push(string);
     }
 
-    let api = Api::new().unwrap();
-    let repo = api.model("medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX".to_string());
-    let onnx_file = repo.get("onnx/model.onnx").unwrap();
-    let config_file = repo.get("config.json").unwrap();
-    let vectorizer_file = repo.get("tokenizer.json").unwrap();
-    let _data_file = repo.get("onnx/model.onnx_data");
+    let model = match args.model {
+        Some(embedding_model) => embedding_model,
+        None => EmbeddingModel::default(),
+    };
 
-    let config = File::open(config_file).expect("file should open read only");
+    let model_files = get_model_files(model);
+
+    let config = File::open(model_files.config).expect("file should open read only");
     let json: serde_json::Value =
         serde_json::from_reader(config).expect("file should be proper JSON");
     let model_type = json
@@ -90,7 +77,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         },
         ..Default::default()
     };
-    let mut tokenizer = Tokenizer::from_file(vectorizer_file).unwrap();
+    let mut tokenizer = Tokenizer::from_file(model_files.tokenizer).unwrap();
     tokenizer.with_padding(Some(padding));
 
     let mut session = Session::builder()
@@ -101,7 +88,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         .unwrap()
         .with_intra_threads(1)
         .unwrap()
-        .commit_from_file(onnx_file)
+        .commit_from_file(model_files.onnx)
         .unwrap();
 
     let encodings = tokenizer.encode_batch(input.clone(), true).unwrap();

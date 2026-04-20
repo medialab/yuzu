@@ -1,6 +1,6 @@
 use ndarray::{Array2, ArrayViewD, Ix2, s};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Pooling {
     Mean,
     LastToken,

@@ -1,4 +1,5 @@
 use std::io;
+use std::num::NonZeroUsize;
 use std::process;
 use std::str::Utf8Error;
 
@@ -62,6 +63,34 @@ pub struct CommonArgs {
     /// Will default to a comma.
     #[arg(short, long)]
     delimiter: Option<utils::io::Delimiter>,
+}
+
+#[derive(Args, Debug)]
+pub struct ParallelizationArgs {
+    /// Whether to use parallelization to speed up computation.
+    /// Will automatically select a suitable number of threads to use based on
+    /// your number of cores. Use -t/--threads if you want to indicate the
+    /// number of threads yourself.
+    #[arg(short, long)]
+    parallel: bool,
+    /// Parallelize computations using this many threads. Use -p/--parallel
+    /// if you want the numbe of threads to be automatically chosen instead.
+    #[arg(short, long)]
+    threads: Option<NonZeroUsize>,
+}
+
+impl ParallelizationArgs {
+    fn threads(&self) -> Option<usize> {
+        if let Some(t) = self.threads {
+            Some(t.get())
+        } else {
+            if self.parallel {
+                Some(num_cpus::get().min(16))
+            } else {
+                None
+            }
+        }
+    }
 }
 
 #[derive(Subcommand)]

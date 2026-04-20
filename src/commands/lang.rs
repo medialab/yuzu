@@ -6,7 +6,7 @@ use whichlang::detect_language;
 
 use crate::utils::io::{Input, Output};
 use crate::utils::select::SelectedColumns;
-use crate::{CLIResult, CommonArgs};
+use crate::{CLIResult, CommonArgs, ParallelizationArgs};
 
 #[derive(Args, Debug)]
 pub struct LangArgs {
@@ -26,6 +26,8 @@ pub struct LangArgs {
     /// Path to output file. Will write to stdout if not given or if path is "-".
     #[arg(short, long)]
     output: Option<String>,
+    #[command(flatten)]
+    parallelization: ParallelizationArgs,
     #[command(flatten)]
     common: CommonArgs,
 }

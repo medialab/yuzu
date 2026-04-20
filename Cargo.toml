@@ -55,7 +55,7 @@ ort = "2.0.0-rc.10"
 serde = { version = "1", features = ["rc"] }
 serde_derive = "1"
 serde_json = "1.0"
-simd-csv = "0.10.2"
+simd-csv = "0.12.0"
 tokenizers = "0.22.1"
 whichlang = "0.1.1"
 zstd = "0.13.3"

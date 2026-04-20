@@ -8,7 +8,7 @@ pub enum Pooling {
 }
 
 impl Pooling {
-    fn apply(
+    pub fn apply(
         self,
         last_hidden_state: &ArrayViewD<f32>,
         attention_mask_array: Option<&ArrayViewD<i64>>,

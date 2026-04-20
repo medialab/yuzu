@@ -1,5 +1,5 @@
 use clap::Args;
-use ndarray::{Array2, ArrayView1, Axis};
+use ndarray::{ArrayView1, Axis};
 use ort::{
     execution_providers::CPUExecutionProvider,
     session::{Session, builder::GraphOptimizationLevel},
@@ -7,12 +7,11 @@ use ort::{
 };
 use simd_csv::ByteRecord;
 use std::fs::File;
-use tokenizers::{PaddingDirection, Tokenizer};
+use tokenizers::Tokenizer;
 
 use crate::utils::hf::EmbeddingModel;
 use crate::utils::hf::get_model_files;
 use crate::utils::io;
-use crate::utils::pooling;
 use crate::utils::select::SelectedColumns;
 use crate::{CLIResult, CommonArgs};
 
@@ -55,12 +54,14 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         input.push(string);
     }
 
-    let model = match args.model {
-        Some(embedding_model) => embedding_model,
-        None => EmbeddingModel::default(),
+    let model = args.model.unwrap_or_default();
+
+    let padding = tokenizers::PaddingParams {
+        direction: model.padding_direction,
+        ..Default::default()
     };
 
-    let model_files = get_model_files(model);
+    let model_files = get_model_files(&model);
 
     let config = File::open(model_files.config).expect("file should open read only");
     let json: serde_json::Value =
@@ -70,13 +71,6 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         .expect("file should have model_type key")
         .as_str();
 
-    let padding = tokenizers::PaddingParams {
-        direction: match model_type {
-            Some("qwen3") => PaddingDirection::Left,
-            _ => PaddingDirection::Right,
-        },
-        ..Default::default()
-    };
     let mut tokenizer = Tokenizer::from_file(model_files.tokenizer).unwrap();
     tokenizer.with_padding(Some(padding));
 
@@ -124,11 +118,11 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
 
     let last_hidden_state = session_output[0].try_extract_array::<f32>().unwrap();
 
+    // TODO: What if attention_mask is not needed? in pooling.apply?
     let attention_mask = a_mask.try_extract_array::<i64>().unwrap();
-    let pooled_embeddings: Array2<f32> = match model_type {
-        Some("qwen3") => pooling::last_token(&last_hidden_state),
-        _ => pooling::mean_pooling(&last_hidden_state, Some(&attention_mask)),
-    };
+    let pooled_embeddings = model
+        .pooling
+        .apply(&last_hidden_state, Some(&attention_mask));
 
     let normalized: Vec<Vec<f32>> = pooled_embeddings
         .axis_iter(Axis(0))

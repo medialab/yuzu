@@ -8,9 +8,9 @@ use crate::utils::pooling;
 #[derive(Debug, Clone)]
 pub struct EmbeddingModel {
     model_id: String,
-    dim: isize,
-    padding_direction: PaddingDirection,
-    pooling: pooling::Pooling,
+    _dim: isize,
+    pub padding_direction: PaddingDirection,
+    pub pooling: pooling::Pooling,
     onnx_file: String,
     config_file: String,
     tokenizer_file: String,
@@ -21,7 +21,7 @@ impl Default for EmbeddingModel {
     fn default() -> Self {
         Self {
             model_id: String::from("ibm-granite/granite-embedding-107m-multilingual"),
-            dim: 384,
+            _dim: 384,
             padding_direction: PaddingDirection::Left,
             pooling: pooling::Pooling::Cls,
             onnx_file: String::from("model.onnx"),
@@ -39,14 +39,14 @@ impl FromStr for EmbeddingModel {
         match value {
             "ibm-granite/granite-embedding-107m-multilingual" => Ok(EmbeddingModel {
                 model_id: String::from("ibm-granite/granite-embedding-107m-multilingual"),
-                dim: 384,
+                _dim: 384,
                 padding_direction: PaddingDirection::Left,
                 pooling: pooling::Pooling::Cls,
                 ..Default::default()
             }),
             "medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX" => Ok(EmbeddingModel {
                 model_id: String::from("medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX"),
-                dim: 1024,
+                _dim: 1024,
                 padding_direction: PaddingDirection::Left,
                 pooling: pooling::Pooling::LastToken,
                 onnx_file: String::from("onnx/model.onnx"),
@@ -61,24 +61,19 @@ impl FromStr for EmbeddingModel {
     }
 }
 
-pub static model_list: [&str; 2] = [
-    "ibm-granite/granite-embedding-107m-multilingual",
-    "medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX",
-];
-
 pub struct ModelPaths {
     pub onnx: PathBuf,
     pub config: PathBuf,
     pub tokenizer: PathBuf,
 }
 
-pub fn get_model_files(model: EmbeddingModel) -> ModelPaths {
+pub fn get_model_files(model: &EmbeddingModel) -> ModelPaths {
     let api = Api::new().unwrap();
-    let repo = api.model(model.model_id);
+    let repo = api.model(model.model_id.clone());
     let onnx_file = repo.get(&model.onnx_file).unwrap();
     let config_file = repo.get(&model.config_file).unwrap();
     let tokenizer_file = repo.get(&model.tokenizer_file).unwrap();
-    if let Some(data_file) = model.onnx_data_file {
+    if let Some(data_file) = model.onnx_data_file.clone() {
         let _data_file = repo.get(&data_file);
     }
     let _data_file = repo.get("onnx/model.onnx_data");

@@ -10,13 +10,16 @@ use crate::{CLIResult, CommonArgs};
 
 #[derive(Args, Debug)]
 pub struct LangArgs {
-    /// Column containing the text to classify
+    /// Column containing text to classify
     column: SelectedColumns,
-    /// Path to CSV file containing text to classify (will use stdin if not given or if path is "-").
+    /// Path to input CSV file (will use stdin if not given or if path is "-").
     input: Option<String>,
     /// Whether to emit full English name of detected lang instead of ISO-639-3 code.
     #[arg(long)]
     full_name: bool,
+    /// Name of the added column containing detected lang.
+    #[arg(long, default_value = "lang")]
+    lang_column: String,
     /// Path to output file. Will write to stdout if not given or if path is "-".
     #[arg(short, long)]
     output: Option<String>,
@@ -34,7 +37,7 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
 
     let mut writer = Output::new(&args.output).csv_writer()?;
 
-    headers.push_field(b"lang");
+    headers.push_field(args.lang_column.as_bytes());
 
     writer.write_byte_record(&headers)?;
 

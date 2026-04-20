@@ -64,13 +64,13 @@ impl Compression {
     }
 }
 
-pub struct CSVInput {
+pub struct Input {
     path: Option<PathBuf>,
     delimiter: u8,
     compression: Option<Compression>,
 }
 
-impl Default for CSVInput {
+impl Default for Input {
     fn default() -> Self {
         Self {
             path: None,
@@ -80,7 +80,7 @@ impl Default for CSVInput {
     }
 }
 
-impl CSVInput {
+impl Input {
     pub fn new(path_opt: &Option<String>) -> Self {
         let mut input = Self::default();
 
@@ -144,12 +144,12 @@ impl CSVInput {
     }
 }
 
-pub struct CSVOutput {
+pub struct Output {
     path: Option<PathBuf>,
     delimiter: u8,
 }
 
-impl Default for CSVOutput {
+impl Default for Output {
     fn default() -> Self {
         Self {
             path: None,
@@ -158,7 +158,7 @@ impl Default for CSVOutput {
     }
 }
 
-impl CSVOutput {
+impl Output {
     pub fn new(path_opt: &Option<String>) -> Self {
         let mut input = Self::default();
 

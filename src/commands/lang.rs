@@ -2,7 +2,7 @@ use clap::Args;
 use simd_csv::ByteRecord;
 use whichlang::detect_language;
 
-use crate::utils::io::{CSVInput, CSVOutput};
+use crate::utils::io::{Input, Output};
 use crate::utils::select::SelectedColumns;
 use crate::{CLIResult, CommonArgs};
 
@@ -20,13 +20,13 @@ pub struct LangArgs {
 }
 
 pub fn action(args: LangArgs) -> CLIResult<()> {
-    let mut reader = CSVInput::new(&args.input)
+    let mut reader = Input::new(&args.input)
         .delimiter(args.common.delimiter)
         .csv_reader()?;
     let mut headers = reader.byte_headers()?.clone();
     let column_index = args.column.single_selection(&headers, true)?;
 
-    let mut writer = CSVOutput::new(&args.output).csv_writer()?;
+    let mut writer = Output::new(&args.output).csv_writer()?;
 
     headers.push_field(b"lang");
 

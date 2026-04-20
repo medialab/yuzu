@@ -53,7 +53,7 @@ impl Default for EmbeddingModel {
 }
 
 pub fn action(args: EmbedArgs) -> CLIResult<()> {
-    let mut reader = io::CSVInput::new(&args.path)
+    let mut reader = io::Input::new(&args.path)
         .delimiter(args.common.delimiter)
         .csv_reader()?;
     let headers = reader.byte_headers()?;
@@ -148,7 +148,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         .map(l2_normalize)
         .collect();
 
-    let mut writer = io::CSVOutput::new(&None).csv_writer()?;
+    let mut writer = io::Output::new(&None).csv_writer()?;
     for i in &normalized {
         let mut record = ByteRecord::new();
         for f in i {

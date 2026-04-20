@@ -28,6 +28,10 @@ doctest = false
 [[test]]
 name = "tests"
 
+[[test]]
+name = "heavy"
+test = false
+
 [profile.release]
 codegen-units = 1
 lto = true

@@ -1,0 +1,90 @@
+use hf_hub::api::sync::Api;
+use std::path::PathBuf;
+use std::str::FromStr;
+use tokenizers::PaddingDirection;
+
+use crate::utils::pooling;
+
+#[derive(Debug, Clone)]
+pub struct EmbeddingModel {
+    model_id: String,
+    dim: isize,
+    padding_direction: PaddingDirection,
+    pooling: pooling::Pooling,
+    onnx_file: String,
+    config_file: String,
+    tokenizer_file: String,
+    onnx_data_file: Option<String>,
+}
+
+impl Default for EmbeddingModel {
+    fn default() -> Self {
+        Self {
+            model_id: String::from("ibm-granite/granite-embedding-107m-multilingual"),
+            dim: 384,
+            padding_direction: PaddingDirection::Left,
+            pooling: pooling::Pooling::Cls,
+            onnx_file: String::from("model.onnx"),
+            config_file: String::from("config.json"),
+            tokenizer_file: String::from("tokenizer.json"),
+            onnx_data_file: None,
+        }
+    }
+}
+
+impl FromStr for EmbeddingModel {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "ibm-granite/granite-embedding-107m-multilingual" => Ok(EmbeddingModel {
+                model_id: String::from("ibm-granite/granite-embedding-107m-multilingual"),
+                dim: 384,
+                padding_direction: PaddingDirection::Left,
+                pooling: pooling::Pooling::Cls,
+                ..Default::default()
+            }),
+            "medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX" => Ok(EmbeddingModel {
+                model_id: String::from("medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX"),
+                dim: 1024,
+                padding_direction: PaddingDirection::Left,
+                pooling: pooling::Pooling::LastToken,
+                onnx_file: String::from("onnx/model.onnx"),
+                onnx_data_file: Some(String::from("onnx/model.onnx_data")),
+                ..Default::default()
+            }),
+            _ => {
+                let msg = format!("Model {} not supported", value);
+                Err(msg)
+            }
+        }
+    }
+}
+
+pub static model_list: [&str; 2] = [
+    "ibm-granite/granite-embedding-107m-multilingual",
+    "medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX",
+];
+
+pub struct ModelPaths {
+    pub onnx: PathBuf,
+    pub config: PathBuf,
+    pub tokenizer: PathBuf,
+}
+
+pub fn get_model_files(model: EmbeddingModel) -> ModelPaths {
+    let api = Api::new().unwrap();
+    let repo = api.model(model.model_id);
+    let onnx_file = repo.get(&model.onnx_file).unwrap();
+    let config_file = repo.get(&model.config_file).unwrap();
+    let tokenizer_file = repo.get(&model.tokenizer_file).unwrap();
+    if let Some(data_file) = model.onnx_data_file {
+        let _data_file = repo.get(&data_file);
+    }
+    let _data_file = repo.get("onnx/model.onnx_data");
+    ModelPaths {
+        onnx: onnx_file,
+        config: config_file,
+        tokenizer: tokenizer_file,
+    }
+}

@@ -1,7 +1,9 @@
 use std::fs::File;
-use std::io::{self, IsTerminal, Read, Write};
+use std::io::{self, BufWriter, IsTerminal, Read, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
+
+const DEFAULT_BUFFERED_WRITER_CAPACITY: usize = 32 * (1 << 10);
 
 pub type BoxedReader = Box<dyn Read + Send + 'static>;
 pub type BoxedWriter = Box<dyn Write + Send + 'static>;
@@ -178,8 +180,15 @@ impl Output {
         }
     }
 
+    pub fn buf_writer(&self) -> io::Result<BufWriter<BoxedWriter>> {
+        Ok(BufWriter::with_capacity(
+            DEFAULT_BUFFERED_WRITER_CAPACITY,
+            self.writer()?,
+        ))
+    }
+
     fn csv_writer_builder(&self) -> simd_csv::WriterBuilder {
-        let mut builder = simd_csv::WriterBuilder::with_capacity(32 * (1 << 10));
+        let mut builder = simd_csv::WriterBuilder::with_capacity(DEFAULT_BUFFERED_WRITER_CAPACITY);
 
         builder.delimiter(self.delimiter);
 

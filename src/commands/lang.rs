@@ -1,6 +1,7 @@
 use std::str::from_utf8;
 
 use clap::Args;
+use pariter::IteratorExt;
 use simd_csv::ByteRecord;
 use whichlang::detect_language;
 
@@ -8,7 +9,7 @@ use crate::utils::io::{Input, Output};
 use crate::utils::select::SelectedColumns;
 use crate::{CLIResult, CommonArgs, ParallelizationArgs};
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Clone)]
 pub struct LangArgs {
     /// Column containing text to classify
     column: SelectedColumns,
@@ -32,6 +33,27 @@ pub struct LangArgs {
     common: CommonArgs,
 }
 
+impl LangArgs {
+    fn process_record(&self, record: &mut ByteRecord, column_index: usize) -> CLIResult<()> {
+        let text = &record[column_index];
+        let lang_opt = detect_language(from_utf8(text)?);
+
+        let cell = if let Some(lang) = lang_opt {
+            if self.full_name {
+                lang.eng_name()
+            } else {
+                lang.three_letter_code()
+            }
+        } else {
+            &self.default
+        };
+
+        record.push_field(cell.as_bytes());
+
+        Ok(())
+    }
+}
+
 pub fn action(args: LangArgs) -> CLIResult<()> {
     let mut reader = Input::new(&args.input)
         .delimiter(args.common.delimiter)
@@ -48,25 +70,26 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
         writer.write_byte_record(&headers)?;
     }
 
-    let mut record = ByteRecord::new();
+    if let Some(t) = args.parallelization.threads() {
+        for result in reader.into_byte_records().parallel_map_custom(
+            |o| o.threads(t),
+            move |result| -> CLIResult<ByteRecord> {
+                let mut record = result?;
+                args.process_record(&mut record, column_index)?;
+                Ok(record)
+            },
+        ) {
+            let record = result?;
+            writer.write_byte_record(&record)?;
+        }
+    } else {
+        let mut record = ByteRecord::new();
 
-    while reader.read_byte_record(&mut record)? {
-        let text = &record[column_index];
-        let lang_opt = detect_language(from_utf8(text)?);
-
-        let cell = if let Some(lang) = lang_opt {
-            if args.full_name {
-                lang.eng_name()
-            } else {
-                lang.three_letter_code()
-            }
-        } else {
-            &args.default
-        };
-
-        record.push_field(cell.as_bytes());
-        writer.write_byte_record(&record)?;
+        while reader.read_byte_record(&mut record)? {
+            args.process_record(&mut record, column_index)?;
+            writer.write_byte_record(&record)?;
+        }
     }
 
-    Ok(())
+    Ok(writer.flush()?)
 }

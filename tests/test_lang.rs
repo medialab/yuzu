@@ -82,3 +82,21 @@ fn lang_default() {
             &["", "und"],
         ]);
 }
+
+#[test]
+fn lang_parallel() {
+    cmd()
+        .arg("lang")
+        .arg("sentence")
+        .arg("-p")
+        .write_csv_stdin(&[
+            &["sentence"],
+            &["this is an English sentence"],
+            &["cette phrase est en français"],
+        ])
+        .assert_csv(&[
+            &["sentence", "lang"],
+            &["this is an English sentence", "eng"],
+            &["cette phrase est en français", "fra"],
+        ]);
+}

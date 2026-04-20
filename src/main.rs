@@ -54,7 +54,7 @@ struct YuzuArgs {
     command: Option<Commands>,
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Clone)]
 pub struct CommonArgs {
     /// When set, first row of CSV input will not be interpreted as a header.
     #[arg(short, long)]
@@ -65,7 +65,7 @@ pub struct CommonArgs {
     delimiter: Option<utils::io::Delimiter>,
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Clone)]
 pub struct ParallelizationArgs {
     /// Whether to use parallelization to speed up computation.
     /// Will automatically select a suitable number of threads to use based on

@@ -6,6 +6,7 @@ use simd_csv::ByteRecord;
 use whichlang::detect_language;
 
 use crate::utils::io::{Input, Output};
+use crate::utils::iter::IteratorExt as _;
 use crate::utils::select::SelectedColumns;
 use crate::{CLIResult, CommonArgs, ParallelizationArgs};
 
@@ -71,16 +72,22 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
     }
 
     if let Some(t) = args.parallelization.threads() {
-        for result in reader.into_byte_records().parallel_map_custom(
+        for result in reader.into_byte_records().chunks(64).parallel_map_custom(
             |o| o.threads(t),
-            move |result| -> CLIResult<ByteRecord> {
-                let mut record = result?;
-                args.process_record(&mut record, column_index)?;
-                Ok(record)
+            move |results| -> CLIResult<Vec<ByteRecord>> {
+                results
+                    .into_iter()
+                    .map(|result| -> CLIResult<ByteRecord> {
+                        let mut record = result?;
+                        args.process_record(&mut record, column_index)?;
+                        Ok(record)
+                    })
+                    .collect::<Result<Vec<_>, _>>()
             },
         ) {
-            let record = result?;
-            writer.write_byte_record(&record)?;
+            for record in result? {
+                writer.write_byte_record(&record)?;
+            }
         }
     } else {
         let mut record = ByteRecord::new();

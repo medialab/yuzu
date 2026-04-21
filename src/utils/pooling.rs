@@ -21,27 +21,11 @@ impl Pooling {
     }
 }
 
-fn print_shape3(last_hidden_state: &ArrayViewD<f32>) {
-    let (batch_size, seq_len, hidden_dim) = {
-        let shape = last_hidden_state.shape();
-        (shape[0], shape[1], shape[2])
-    };
-
-    dbg!(
-        "batch size: {}, seq_len: {}, hidden_dim: {}",
-        batch_size,
-        seq_len,
-        hidden_dim
-    );
-}
-
 pub fn mean_pooling(
     // Inspired from https://docs.rs/fastembed/latest/src/fastembed/pooling.rs.html#34
     last_hidden_state: &ArrayViewD<f32>,
     attention_mask_array: Option<&ArrayViewD<i64>>,
 ) -> Array2<f32> {
-    print_shape3(last_hidden_state);
-
     let token_embeddings = last_hidden_state.slice(s![.., .., ..]);
     let attention_mask = attention_mask_array
         .unwrap()
@@ -59,8 +43,6 @@ pub fn mean_pooling(
 }
 
 pub fn last_token(last_hidden_state: &ArrayViewD<f32>) -> Array2<f32> {
-    print_shape3(last_hidden_state);
-
     let token_embeddings = last_hidden_state.slice(s![.., .., ..]);
     let sliced = token_embeddings.slice(s![.., -1, ..]);
 
@@ -68,8 +50,6 @@ pub fn last_token(last_hidden_state: &ArrayViewD<f32>) -> Array2<f32> {
 }
 
 pub fn first_token(last_hidden_state: &ArrayViewD<f32>) -> Array2<f32> {
-    print_shape3(last_hidden_state);
-
     let token_embeddings = last_hidden_state.slice(s![.., .., ..]);
     let sliced = token_embeddings.slice(s![.., 0, ..]);
 

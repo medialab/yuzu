@@ -232,10 +232,10 @@ impl Output {
         Ok(self.csv_writer_from_writer(self.writer()?))
     }
 
-    pub fn npy_f32_writer(
+    pub fn npy_writer<T: npyz::AutoSerialize>(
         &self,
         dimensions: u64,
-    ) -> io::Result<npyz::NpyWriter<f32, BufWriter<BoxedSeekableWriter>>> {
+    ) -> io::Result<npyz::NpyWriter<T, BufWriter<BoxedSeekableWriter>>> {
         let buf_writer = self.seekable_buf_writer()?;
 
         npyz::WriteOptions::new()

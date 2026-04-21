@@ -83,12 +83,10 @@ impl ParallelizationArgs {
     fn threads(&self) -> Option<usize> {
         if let Some(t) = self.threads {
             Some(t.get())
+        } else if self.parallel {
+            Some(num_cpus::get().min(16))
         } else {
-            if self.parallel {
-                Some(num_cpus::get().min(16))
-            } else {
-                None
-            }
+            None
         }
     }
 }

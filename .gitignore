@@ -1,3 +1,4 @@
 /target
 *.csv
 .vscode
+/python_script/.ruff_cache

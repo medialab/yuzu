@@ -67,7 +67,7 @@ impl YuzuCommand {
                     .take(5)
                     .map(|cell| {
                         let x = std::str::from_utf8(cell).unwrap().parse::<f32>().unwrap();
-                        (x * 1_000_000.0).round() / 1_000_000.0
+                        (x * 100_000.0).round() / 100_000.0
                     })
                     .collect::<Vec<_>>()
             })

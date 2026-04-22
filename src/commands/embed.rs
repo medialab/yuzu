@@ -12,6 +12,7 @@ use tokenizers::Tokenizer;
 use crate::utils::hf::EmbeddingModel;
 use crate::utils::hf::get_model_files;
 use crate::utils::io;
+use crate::utils::iter::IteratorExt;
 use crate::utils::select::SelectedColumns;
 use crate::{CLIResult, CommonArgs};
 
@@ -24,69 +25,19 @@ fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
     }
 }
 
-#[derive(Args, Debug)]
-pub struct EmbedArgs {
-    column: SelectedColumns,
-
-    /// Path to CSV file containing text to classify (will use stdin if not given or if path is "-").
-    input: Option<String>,
-
-    #[arg(short, long)]
-    model: Option<EmbeddingModel>,
-
-    #[command(flatten)]
-    common: CommonArgs,
-}
-
-pub fn action(args: EmbedArgs) -> CLIResult<()> {
-    let mut reader = io::Input::new(&args.input)
-        .delimiter(args.common.delimiter)
-        .csv_reader()?;
-    let headers = reader.byte_headers()?;
-    let column_index = args.column.single_selection(headers, true)?;
-
-    let mut record = ByteRecord::new();
-
-    let mut input: Vec<String> = Vec::new();
-
-    while reader.read_byte_record(&mut record)? {
-        let string = String::from_utf8(record[column_index].to_vec()).unwrap();
-        input.push(string);
-    }
-
-    let model = args.model.unwrap_or_default();
-
-    let padding = tokenizers::PaddingParams {
-        direction: model.padding_direction,
-        ..Default::default()
-    };
-
-    let model_files = get_model_files(&model);
-
-    let config = File::open(model_files.config).expect("file should open read only");
-    let json: serde_json::Value =
-        serde_json::from_reader(config).expect("file should be proper JSON");
-    let model_type = json
-        .get("model_type")
-        .expect("file should have model_type key")
-        .as_str();
-
-    let mut tokenizer = Tokenizer::from_file(model_files.tokenizer).unwrap();
-    tokenizer.with_padding(Some(padding));
-
-    let mut session = Session::builder()
-        .unwrap()
-        .with_optimization_level(GraphOptimizationLevel::Level1)
-        .unwrap()
-        .with_execution_providers([CPUExecutionProvider::default().build()])
-        .unwrap()
-        .with_intra_threads(1)
-        .unwrap()
-        .commit_from_file(model_files.onnx)
-        .unwrap();
-
+fn encode(
+    input: Vec<String>,
+    session: &mut Session,
+    tokenizer: &Tokenizer,
+    model: &EmbeddingModel,
+    model_type: Option<&str>,
+) -> Vec<Vec<f32>> {
     let encodings = tokenizer.encode_batch(input.clone(), true).unwrap();
-    let padded_token_length = encodings[0].len();
+    let padded_token_length = encodings
+        .iter()
+        .map(|encoding| encoding.len())
+        .max()
+        .unwrap();
 
     let ids: Vec<i64> = encodings
         .iter()
@@ -128,14 +79,78 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         .axis_iter(Axis(0))
         .map(l2_normalize)
         .collect();
+    normalized
+}
 
+#[derive(Args, Debug)]
+pub struct EmbedArgs {
+    column: SelectedColumns,
+
+    /// Path to CSV file containing text to classify (will use stdin if not given or if path is "-").
+    input: Option<String>,
+
+    #[arg(short, long)]
+    model: Option<EmbeddingModel>,
+
+    #[command(flatten)]
+    common: CommonArgs,
+}
+
+pub fn action(args: EmbedArgs) -> CLIResult<()> {
+    let mut reader = io::Input::new(&args.input)
+        .delimiter(args.common.delimiter)
+        .csv_reader()?;
+    let headers = reader.byte_headers()?;
+    let column_index = args.column.single_selection(headers, true)?;
     let mut writer = io::Output::new(&None).csv_writer()?;
-    for i in &normalized {
-        let mut record = ByteRecord::new();
-        for f in i {
-            record.push_field(f.to_string().as_bytes());
+
+    let model = args.model.unwrap_or_default();
+
+    let padding = tokenizers::PaddingParams {
+        direction: model.padding_direction,
+        ..Default::default()
+    };
+
+    let model_files = get_model_files(&model);
+
+    let config = File::open(model_files.config).expect("file should open read only");
+    let json: serde_json::Value =
+        serde_json::from_reader(config).expect("file should be proper JSON");
+    let model_type = json
+        .get("model_type")
+        .expect("file should have model_type key")
+        .as_str();
+
+    let mut tokenizer = Tokenizer::from_file(model_files.tokenizer).unwrap();
+    tokenizer.with_padding(Some(padding));
+
+    let mut session = Session::builder()
+        .unwrap()
+        .with_optimization_level(GraphOptimizationLevel::Level1)
+        .unwrap()
+        .with_execution_providers([CPUExecutionProvider::default().build()])
+        .unwrap()
+        .with_intra_threads(1)
+        .unwrap()
+        .commit_from_file(model_files.onnx)
+        .unwrap();
+
+    for chunk in reader.into_byte_records().chunks(32) {
+        let mut input: Vec<String> = Vec::new();
+        for result in chunk.into_iter() {
+            let record = result?;
+            let string = String::from_utf8(record[column_index].to_vec()).unwrap();
+            input.push(string);
         }
-        writer.write_byte_record(&record)?;
+        let embedding = encode(input, &mut session, &tokenizer, &model, model_type);
+        for i in &embedding {
+            let mut record = ByteRecord::new();
+            for f in i {
+                record.push_field(f.to_string().as_bytes());
+            }
+            writer.write_byte_record(&record)?;
+        }
     }
+
     Ok(())
 }

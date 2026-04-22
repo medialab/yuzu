@@ -1,4 +1,4 @@
-use crate::cmd;
+use crate::utils::cmd;
 
 #[test]
 fn lang() {

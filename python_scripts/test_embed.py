@@ -8,7 +8,7 @@ parser = ArgumentParser(
 
 parser.add_argument(
     "model",
-    choices=["Qwen/Qwen3-Embedding-0.6B", "NeuML/pubmedbert-base-embeddings-100K"],
+    choices=["Qwen/Qwen3-Embedding-0.6B", "sentence-transformers/all-MiniLM-L6-v2", "ibm-granite/granite-embedding-107m-multilingual"],
 )
 args = parser.parse_args()
 

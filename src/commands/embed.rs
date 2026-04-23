@@ -54,13 +54,21 @@ fn encode(
         .flat_map(|_| (0..padded_token_length as i64))
         .collect();
 
+    let type_ids: Vec<i64> = encodings
+        .iter()
+        .flat_map(|e| e.get_type_ids().iter().map(|i| *i as i64))
+        .collect();
+
     let a_ids = TensorRef::from_array_view(([input.len(), padded_token_length], &*ids)).unwrap();
     let a_mask = TensorRef::from_array_view(([input.len(), padded_token_length], &*mask)).unwrap();
     let a_position_ids =
         TensorRef::from_array_view(([input.len(), padded_token_length], &*position_ids)).unwrap();
+    let a_type_ids =
+        TensorRef::from_array_view(([input.len(), padded_token_length], &*type_ids)).unwrap();
 
     let session_input = match model_type {
         Some("qwen3") => Vec::from(ort::inputs![a_ids, a_mask.clone(), a_position_ids]),
+        Some("bert") => Vec::from(ort::inputs![a_ids, a_mask.clone(), a_type_ids]),
         _ => Vec::from(ort::inputs![a_ids, a_mask.clone()]),
     };
 
@@ -111,6 +119,11 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         ..Default::default()
     };
 
+    let truncation = tokenizers::TruncationParams {
+        max_length: model.max_length,
+        ..Default::default()
+    };
+
     let model_files = get_model_files(&model);
 
     let config = File::open(model_files.config).expect("file should open read only");
@@ -123,6 +136,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
 
     let mut tokenizer = Tokenizer::from_file(model_files.tokenizer).unwrap();
     tokenizer.with_padding(Some(padding));
+    tokenizer.with_truncation(Some(truncation)).unwrap();
 
     let mut session = Session::builder()
         .unwrap()

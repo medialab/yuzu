@@ -11,6 +11,7 @@ pub struct EmbeddingModel {
     _dim: isize,
     pub padding_direction: PaddingDirection,
     pub pooling: pooling::Pooling,
+    pub max_length: usize,
     onnx_file: String,
     config_file: String,
     tokenizer_file: String,
@@ -22,8 +23,9 @@ impl Default for EmbeddingModel {
         Self {
             model_id: String::from("ibm-granite/granite-embedding-107m-multilingual"),
             _dim: 384,
-            padding_direction: PaddingDirection::Left,
+            padding_direction: PaddingDirection::Right,
             pooling: pooling::Pooling::Cls,
+            max_length: 512,
             onnx_file: String::from("model.onnx"),
             config_file: String::from("config.json"),
             tokenizer_file: String::from("tokenizer.json"),
@@ -37,20 +39,24 @@ impl FromStr for EmbeddingModel {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "ibm-granite/granite-embedding-107m-multilingual" => Ok(EmbeddingModel {
-                model_id: String::from("ibm-granite/granite-embedding-107m-multilingual"),
-                _dim: 384,
-                padding_direction: PaddingDirection::Left,
-                pooling: pooling::Pooling::Cls,
-                ..Default::default()
-            }),
-            "medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX" => Ok(EmbeddingModel {
+            "ibm-granite/granite-embedding-107m-multilingual" => Ok(Default::default()),
+            "Qwen/Qwen3-Embedding-0.6B" => Ok(EmbeddingModel {
                 model_id: String::from("medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX"),
                 _dim: 1024,
                 padding_direction: PaddingDirection::Left,
                 pooling: pooling::Pooling::LastToken,
+                max_length: 8192,
                 onnx_file: String::from("onnx/model.onnx"),
                 onnx_data_file: Some(String::from("onnx/model.onnx_data")),
+                ..Default::default()
+            }),
+            "sentence-transformers/all-MiniLM-L6-v2" => Ok(EmbeddingModel {
+                model_id: String::from("sentence-transformers/all-MiniLM-L6-v2"),
+                _dim: 512,
+                padding_direction: PaddingDirection::Right,
+                pooling: pooling::Pooling::Mean,
+                max_length: 256,
+                onnx_file: String::from("onnx/model.onnx"),
                 ..Default::default()
             }),
             _ => {

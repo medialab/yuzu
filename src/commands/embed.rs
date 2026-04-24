@@ -7,6 +7,7 @@ use ort::{
 };
 use simd_csv::ByteRecord;
 use std::fs::File;
+use std::iter::zip;
 use tokenizers::Tokenizer;
 
 use crate::utils::hf::EmbeddingModel;
@@ -102,17 +103,22 @@ pub struct EmbedArgs {
 
     #[command(flatten)]
     common: CommonArgs,
+
+    /// Path to output file. Will infer the format (CSV or numpy) depending on the extension (.csv or .npy)
+    /// Will write in CSV to stdout if not given or if path is "-".
+    #[arg(short, long)]
+    output: Option<String>,
 }
 
 pub fn action(args: EmbedArgs) -> CLIResult<()> {
     let mut reader = io::Input::new(&args.input)
         .delimiter(args.common.delimiter)
+        .no_headers(args.common.no_headers)
         .csv_reader()?;
-    let headers = reader.byte_headers()?;
-    let column_index = args.column.single_selection(headers, true)?;
-    let mut writer = io::Output::new(&None).csv_writer()?;
-
+    let column_index = args.column.single_selection(reader.byte_headers()?, true)?;
+    let output = io::Output::new(&args.output);
     let model = args.model.unwrap_or_default();
+    let mut writer = output.vector_writer(model.dim)?;
 
     let padding = tokenizers::PaddingParams {
         direction: model.padding_direction,
@@ -149,22 +155,25 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         .commit_from_file(model_files.onnx)
         .unwrap();
 
+    if reader.has_headers() {
+        writer.write_headers(reader.byte_headers()?, model.dim, "dim_")?;
+    }
+
     for chunk in reader.into_byte_records().chunks(32) {
         let mut input: Vec<String> = Vec::new();
+        let mut records: Vec<ByteRecord> = Vec::new();
         for result in chunk.into_iter() {
             let record = result?;
             let string = String::from_utf8(record[column_index].to_vec()).unwrap();
             input.push(string);
+            records.push(record);
         }
         let embedding = encode(input, &mut session, &tokenizer, &model, model_type);
-        for i in &embedding {
-            let mut record = ByteRecord::new();
-            for f in i {
-                record.push_field(f.to_string().as_bytes());
-            }
-            writer.write_byte_record(&record)?;
+        for (i, mut record) in zip(&embedding, records) {
+            writer.write_vector(&mut record, i)?;
         }
     }
+    writer.finish()?;
 
     Ok(())
 }

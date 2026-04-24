@@ -4,6 +4,9 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use npyz::WriterBuilder;
+extern crate npyz;
+
+use crate::utils::writers;
 
 const DEFAULT_BUFFERED_WRITER_CAPACITY: usize = 32 * (1 << 10);
 
@@ -161,9 +164,30 @@ impl Input {
     }
 }
 
+pub enum FileFormat {
+    Csv,
+    Npy,
+}
+
+impl FileFormat {
+    fn infer_from_path(path: &Option<String>) -> Self {
+        match path {
+            Some(filename) => {
+                if filename.ends_with(".npy") {
+                    Self::Npy
+                } else {
+                    Self::Csv
+                }
+            }
+            None => Self::Csv,
+        }
+    }
+}
+
 pub struct Output {
     path: Option<PathBuf>,
     delimiter: u8,
+    pub format: FileFormat,
 }
 
 impl Default for Output {
@@ -171,17 +195,21 @@ impl Default for Output {
         Self {
             path: None,
             delimiter: b',',
+            format: FileFormat::Csv,
         }
     }
 }
 
 impl Output {
     pub fn new(path_opt: &Option<String>) -> Self {
-        let mut input = Self::default();
+        let mut input = Self {
+            format: FileFormat::infer_from_path(path_opt),
+            ..Default::default()
+        };
 
         if let Some(path) = path_opt {
             if path != "-" {
-                input.path = Some(PathBuf::from(path))
+                input.path = Some(PathBuf::from(path));
             }
         }
 
@@ -191,14 +219,14 @@ impl Output {
     pub fn writer(&self) -> io::Result<BoxedWriter> {
         match &self.path {
             None => Ok(Box::new(io::stdout())),
-            Some(path) => Ok(Box::new(File::open(path)?)),
+            Some(path) => Ok(Box::new(File::create(path)?)),
         }
     }
 
     pub fn seekable_writer(&self) -> io::Result<BoxedSeekableWriter> {
         match &self.path {
             None => Err(io::Error::other("cannot seek output")),
-            Some(path) => Ok(Box::new(File::open(path)?)),
+            Some(path) => Ok(Box::new(File::create(path)?)),
         }
     }
 
@@ -242,5 +270,15 @@ impl Output {
             .default_dtype()
             .writer(buf_writer)
             .begin_2d(dimensions)
+    }
+
+    pub fn vector_writer<T: npyz::AutoSerialize>(
+        &self,
+        dimensions: u64,
+    ) -> io::Result<writers::VectorWriter<T, BoxedWriter, BufWriter<BoxedSeekableWriter>>> {
+        Ok(match self.format {
+            FileFormat::Csv => writers::VectorWriter::from(self.csv_writer()?),
+            FileFormat::Npy => writers::VectorWriter::from(self.npy_writer(dimensions)?),
+        })
     }
 }

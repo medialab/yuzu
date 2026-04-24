@@ -3,12 +3,12 @@ use std::io::{self, Write};
 use npyz::NpyWriter;
 use simd_csv::{ByteRecord, Writer};
 
-pub enum VectorWriter<T: npyz::Serialize, W: Write> {
-    Csv(Box<Writer<W>>),
-    Npy(NpyWriter<T, W>),
+pub enum VectorWriter<T: npyz::Serialize, WCsv: Write, WNpy: Write> {
+    Csv(Box<Writer<WCsv>>),
+    Npy(NpyWriter<T, WNpy>),
 }
 
-impl<T: npyz::Serialize + ToString, W: Write> VectorWriter<T, W> {
+impl<T: npyz::Serialize + ToString, WCsv: Write, WNpy: Write> VectorWriter<T, WCsv, WNpy> {
     pub fn write_headers(
         &mut self,
         headers: &ByteRecord,
@@ -28,11 +28,7 @@ impl<T: npyz::Serialize + ToString, W: Write> VectorWriter<T, W> {
         Ok(())
     }
 
-    pub fn write_vector(
-        &mut self,
-        record: &mut ByteRecord,
-        vector: impl Iterator<Item = T>,
-    ) -> io::Result<()> {
+    pub fn write_vector(&mut self, record: &mut ByteRecord, vector: &[T]) -> io::Result<()> {
         match self {
             Self::Csv(writer) => {
                 for x in vector {
@@ -45,7 +41,7 @@ impl<T: npyz::Serialize + ToString, W: Write> VectorWriter<T, W> {
             }
             Self::Npy(writer) => {
                 for x in vector {
-                    writer.push(&x)?;
+                    writer.push(x)?;
                 }
 
                 Ok(())
@@ -61,14 +57,18 @@ impl<T: npyz::Serialize + ToString, W: Write> VectorWriter<T, W> {
     }
 }
 
-impl<T: npyz::Serialize, W: Write> From<Writer<W>> for VectorWriter<T, W> {
-    fn from(value: Writer<W>) -> Self {
+impl<T: npyz::Serialize, WCsv: Write, WNpy: Write> From<Writer<WCsv>>
+    for VectorWriter<T, WCsv, WNpy>
+{
+    fn from(value: Writer<WCsv>) -> Self {
         Self::Csv(Box::new(value))
     }
 }
 
-impl<T: npyz::Serialize, W: Write> From<NpyWriter<T, W>> for VectorWriter<T, W> {
-    fn from(value: NpyWriter<T, W>) -> Self {
+impl<T: npyz::Serialize, WCsv: Write, WNpy: Write> From<NpyWriter<T, WNpy>>
+    for VectorWriter<T, WCsv, WNpy>
+{
+    fn from(value: NpyWriter<T, WNpy>) -> Self {
         Self::Npy(value)
     }
 }

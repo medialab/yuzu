@@ -8,7 +8,7 @@ use crate::utils::pooling;
 #[derive(Debug, Clone)]
 pub struct EmbeddingModel {
     model_id: String,
-    _dim: isize,
+    pub dim: u64,
     pub padding_direction: PaddingDirection,
     pub pooling: pooling::Pooling,
     pub max_length: usize,
@@ -22,7 +22,7 @@ impl Default for EmbeddingModel {
     fn default() -> Self {
         Self {
             model_id: String::from("ibm-granite/granite-embedding-107m-multilingual"),
-            _dim: 384,
+            dim: 384,
             padding_direction: PaddingDirection::Right,
             pooling: pooling::Pooling::Cls,
             max_length: 512,
@@ -42,7 +42,7 @@ impl FromStr for EmbeddingModel {
             "ibm-granite/granite-embedding-107m-multilingual" => Ok(Default::default()),
             "Qwen/Qwen3-Embedding-0.6B" => Ok(EmbeddingModel {
                 model_id: String::from("medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX"),
-                _dim: 1024,
+                dim: 1024,
                 padding_direction: PaddingDirection::Left,
                 pooling: pooling::Pooling::LastToken,
                 max_length: 8192,
@@ -52,7 +52,7 @@ impl FromStr for EmbeddingModel {
             }),
             "sentence-transformers/all-MiniLM-L6-v2" => Ok(EmbeddingModel {
                 model_id: String::from("sentence-transformers/all-MiniLM-L6-v2"),
-                _dim: 512,
+                dim: 512,
                 padding_direction: PaddingDirection::Right,
                 pooling: pooling::Pooling::Mean,
                 max_length: 256,

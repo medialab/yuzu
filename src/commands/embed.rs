@@ -98,16 +98,17 @@ pub struct EmbedArgs {
     /// Path to CSV file containing text to classify (will use stdin if not given or if path is "-").
     input: Option<String>,
 
+    /// Id of the model on HuggingFace. Defaults to ibm-granite/granite-embedding-107m-multilingual.
     #[arg(short, long)]
     model: Option<EmbeddingModel>,
-
-    #[command(flatten)]
-    common: CommonArgs,
 
     /// Path to output file. Will infer the format (CSV or numpy) depending on the extension (.csv or .npy)
     /// Will write in CSV to stdout if not given or if path is "-".
     #[arg(short, long)]
     output: Option<String>,
+
+    #[command(flatten)]
+    common: CommonArgs,
 }
 
 pub fn action(args: EmbedArgs) -> CLIResult<()> {

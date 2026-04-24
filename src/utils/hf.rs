@@ -1,5 +1,5 @@
 use hf_hub::api::sync::Api;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use tokenizers::PaddingDirection;
 
@@ -16,6 +16,7 @@ pub struct EmbeddingModel {
     config_file: String,
     tokenizer_file: String,
     onnx_data_file: Option<String>,
+    local: bool,
 }
 
 impl Default for EmbeddingModel {
@@ -30,6 +31,7 @@ impl Default for EmbeddingModel {
             config_file: String::from("config.json"),
             tokenizer_file: String::from("tokenizer.json"),
             onnx_data_file: None,
+            local: false,
         }
     }
 }
@@ -53,10 +55,19 @@ impl FromStr for EmbeddingModel {
             "sentence-transformers/all-MiniLM-L6-v2" => Ok(EmbeddingModel {
                 model_id: String::from("sentence-transformers/all-MiniLM-L6-v2"),
                 dim: 384,
-                padding_direction: PaddingDirection::Right,
                 pooling: pooling::Pooling::Mean,
                 max_length: 256,
                 onnx_file: String::from("onnx/model.onnx"),
+                ..Default::default()
+            }),
+            // #[cfg(test)]
+            "test-model" => Ok(EmbeddingModel {
+                model_id: String::from("local"),
+                dim: 384,
+                pooling: pooling::Pooling::Cls,
+                onnx_file: String::from("onnx/model_qint8_arm64.onnx"),
+                max_length: 256,
+                local: true,
                 ..Default::default()
             }),
             _ => {
@@ -74,15 +85,25 @@ pub struct ModelPaths {
 }
 
 pub fn get_model_files(model: &EmbeddingModel) -> ModelPaths {
-    let api = Api::new().unwrap();
-    let repo = api.model(model.model_id.clone());
-    let onnx_file = repo.get(&model.onnx_file).unwrap();
-    let config_file = repo.get(&model.config_file).unwrap();
-    let tokenizer_file = repo.get(&model.tokenizer_file).unwrap();
-    if let Some(data_file) = model.onnx_data_file.clone() {
-        let _data_file = repo.get(&data_file);
-    }
-    let _data_file = repo.get("onnx/model.onnx_data");
+    let (onnx_file, config_file, tokenizer_file) = match model.local {
+        true => (
+            Path::new(&model.model_id).join(&model.onnx_file),
+            Path::new(&model.model_id).join(&model.config_file),
+            Path::new(&model.model_id).join(&model.tokenizer_file),
+        ),
+        false => {
+            let api = Api::new().unwrap();
+            let repo = api.model(model.model_id.clone());
+            if let Some(data_file) = model.onnx_data_file.clone() {
+                let _data_file = repo.get(&data_file);
+            }
+            (
+                repo.get(&model.onnx_file).unwrap(),
+                repo.get(&model.config_file).unwrap(),
+                repo.get(&model.tokenizer_file).unwrap(),
+            )
+        }
+    };
     ModelPaths {
         onnx: onnx_file,
         config: config_file,

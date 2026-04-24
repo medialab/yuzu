@@ -25,7 +25,7 @@ fn embed_bert() {
             &["Le Cochon est un documentaire français de moyen métrage coréalisé par Jean-Michel Barjol et Jean Eustache, sorti en 1970."],
             &["Le Cochon ('The Pig') is a fifty-minute featurette co-directed by Jean Eustache and Jean-Michel Barjol in 1970."],
         ])
-        .assert_csv_matrix(sentence_transformers_matrix);
+        .assert_csv_matrix(sentence_transformers_matrix, 1);
 }
 
 #[test]
@@ -52,7 +52,7 @@ fn embed_granite() {
             &["Le Cochon est un documentaire français de moyen métrage coréalisé par Jean-Michel Barjol et Jean Eustache, sorti en 1970."],
             &["Le Cochon ('The Pig') is a fifty-minute featurette co-directed by Jean Eustache and Jean-Michel Barjol in 1970."],
         ])
-        .assert_csv_matrix(sentence_transformers_matrix);
+        .assert_csv_matrix(sentence_transformers_matrix, 1);
 }
 
 #[test]
@@ -79,5 +79,5 @@ fn embed_qwen3() {
             &["Le Cochon est un documentaire français de moyen métrage coréalisé par Jean-Michel Barjol et Jean Eustache, sorti en 1970."],
             &["Le Cochon ('The Pig') is a fifty-minute featurette co-directed by Jean Eustache and Jean-Michel Barjol in 1970."],
         ])
-        .assert_csv_matrix(sentence_transformers_matrix);
+        .assert_csv_matrix(sentence_transformers_matrix, 1);
 }

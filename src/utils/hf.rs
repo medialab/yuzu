@@ -52,7 +52,7 @@ impl FromStr for EmbeddingModel {
             }),
             "sentence-transformers/all-MiniLM-L6-v2" => Ok(EmbeddingModel {
                 model_id: String::from("sentence-transformers/all-MiniLM-L6-v2"),
-                dim: 512,
+                dim: 384,
                 padding_direction: PaddingDirection::Right,
                 pooling: pooling::Pooling::Mean,
                 max_length: 256,

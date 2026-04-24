@@ -51,7 +51,7 @@ impl YuzuCommand {
     }
 
     #[allow(dead_code)]
-    pub fn assert_csv_matrix(&mut self, data: Vec<Vec<f32>>) {
+    pub fn assert_csv_matrix(&mut self, data: Vec<Vec<f32>>, offset: usize) {
         let assert = self.0.assert().success();
 
         let reader = simd_csv::ReaderBuilder::new()
@@ -60,10 +60,12 @@ impl YuzuCommand {
 
         let records: Vec<Vec<f32>> = reader
             .into_byte_records()
+            .skip(1)
             .map(|record| {
                 record
                     .unwrap()
                     .into_iter()
+                    .skip(offset)
                     .take(5)
                     .map(|cell| {
                         let x = std::str::from_utf8(cell).unwrap().parse::<f32>().unwrap();

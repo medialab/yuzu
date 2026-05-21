@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::io::{self, Write};
 
 use npyz::NpyWriter;
@@ -8,7 +9,7 @@ pub enum VectorWriter<T: npyz::Serialize, WCsv: Write, WNpy: Write> {
     Npy(NpyWriter<T, WNpy>),
 }
 
-impl<T: npyz::Serialize + ToString, WCsv: Write, WNpy: Write> VectorWriter<T, WCsv, WNpy> {
+impl<T: npyz::Serialize + Display, WCsv: Write, WNpy: Write> VectorWriter<T, WCsv, WNpy> {
     pub fn write_headers(
         &mut self,
         headers: &ByteRecord,
@@ -32,7 +33,7 @@ impl<T: npyz::Serialize + ToString, WCsv: Write, WNpy: Write> VectorWriter<T, WC
         match self {
             Self::Csv(writer) => {
                 for x in vector {
-                    record.push_field(x.to_string().as_bytes());
+                    record.fmt_field(x);
                 }
 
                 writer.write_byte_record(record)?;

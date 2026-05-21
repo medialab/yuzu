@@ -1264,8 +1264,9 @@ dependencies = [
 
 [[package]]
 name = "npyz"
-version = "0.9.0"
-source = "git+https://github.com/medialab/npyz?rev=361c892a#361c892a96690fab9cf705ded2c26599425da12e"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a01a88a1d2f89d362475ad16f34de3994f7c86b12259236f5d33537b040bcd4"
 dependencies = [
  "byteorder",
  "num-bigint",

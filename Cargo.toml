@@ -62,7 +62,7 @@ pariter = "0.6.0"
 serde = { version = "1", features = ["rc"] }
 serde_derive = "1"
 serde_json = "1.0"
-simd-csv = "0.12.0"
+simd-csv = { git = "https://github.com/medialab/simd-csv", rev = "0b006c4d" }
 tokenizers = "0.22.1"
 whichlang = { git = "https://github.com/medialab/whichlang", rev = "92591fa2" }
 zstd = "0.13.3"

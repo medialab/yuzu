@@ -2,18 +2,17 @@ use std::str::from_utf8;
 
 use clap::Args;
 use pariter::IteratorExt;
-use simd_csv::ByteRecord;
+use simd_csv::{ByteRecord, Selector};
 use whichlang::detect_language;
 
 use crate::utils::io::{Input, Output};
 use crate::utils::iter::IteratorExt as _;
-use crate::utils::select::SelectedColumns;
 use crate::{CLIResult, CommonArgs, ParallelizationArgs};
 
 #[derive(Args, Debug, Clone)]
 pub struct LangArgs {
     /// Column containing text to classify
-    column: SelectedColumns,
+    column: Selector,
     /// Path to input CSV file (will use stdin if not given or if path is "-").
     input: Option<String>,
     /// Whether to emit full English name of detected lang instead of ISO-639-3 code.
@@ -62,7 +61,7 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
         .csv_reader()?;
 
     let mut headers = reader.byte_headers()?.clone();
-    let column_index = args.column.single_selection(&headers, true)?;
+    let column_index = reader.select_one(&args.column)?;
 
     let mut writer = Output::new(&args.output).csv_writer()?;
 

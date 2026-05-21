@@ -5,7 +5,7 @@ use ort::{
     session::{Session, builder::GraphOptimizationLevel},
     value::TensorRef,
 };
-use simd_csv::ByteRecord;
+use simd_csv::{ByteRecord, Selector};
 use std::fs::File;
 use std::iter::zip;
 use tokenizers::Tokenizer;
@@ -14,7 +14,6 @@ use crate::utils::hf::EmbeddingModel;
 use crate::utils::hf::get_model_files;
 use crate::utils::io;
 use crate::utils::iter::IteratorExt;
-use crate::utils::select::SelectedColumns;
 use crate::{CLIResult, CommonArgs};
 
 fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
@@ -93,7 +92,7 @@ fn encode(
 
 #[derive(Args, Debug)]
 pub struct EmbedArgs {
-    column: SelectedColumns,
+    column: Selector,
 
     /// Path to CSV file containing text to classify (will use stdin if not given or if path is "-").
     input: Option<String>,
@@ -116,7 +115,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         .delimiter(args.common.delimiter)
         .no_headers(args.common.no_headers)
         .csv_reader()?;
-    let column_index = args.column.single_selection(reader.byte_headers()?, true)?;
+    let column_index = reader.select_one(&args.column)?;
     let output = io::Output::new(&args.output);
     let model = args.model.unwrap_or_default();
     let mut writer = output.vector_writer(model.dim)?;

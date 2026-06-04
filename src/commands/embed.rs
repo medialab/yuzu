@@ -1,4 +1,5 @@
 use std::num::NonZeroUsize;
+use std::path::Path;
 
 use clap::Args;
 use ndarray::{ArrayView1, Axis};
@@ -15,6 +16,7 @@ use tokenizers::Tokenizer;
 use crate::utils::hf::{EmbeddingModel, print_models_list};
 use crate::utils::io;
 use crate::utils::iter::IteratorExt;
+use crate::utils::readers::ReaderExt;
 use crate::{CLIResult, CommonArgs, ParallelizationArgs};
 
 fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
@@ -115,6 +117,10 @@ pub struct EmbedArgs {
     #[arg(long, default_value = "32")]
     chunk_size: NonZeroUsize,
 
+    /// Whether to resume from an aborted run. Requires -o/--output to be given.
+    #[arg(long, requires = "output")]
+    resume: bool,
+
     /// Path to output file. Will infer the format (CSV or numpy) depending on the extension (.csv or .npy)
     /// Will write in CSV to stdout if not given or if path is "-".
     #[arg(short, long)]
@@ -135,10 +141,35 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
 
     let threads = args.parallelization.build_rayon_global_thread_pool();
 
+    let rows_to_skip_when_resuming = if args.resume {
+        let output_path = args.output.clone().unwrap();
+
+        if Path::new(&output_path).is_file() {
+            Some(
+                io::Input::new(&Some(output_path))
+                    .csv_splitter()?
+                    .count_records()?,
+            )
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     let mut reader = io::Input::new(&args.input)
         .delimiter(args.common.delimiter)
         .no_headers(args.common.no_headers)
         .csv_reader()?;
+
+    if let Some(skip) = rows_to_skip_when_resuming {
+        reader.skip(skip)?;
+    }
+
+    // TODO: --resume must open output with append, and write headers only if file already exists
+    // TODO: this require Output to have a method to set append mode & to return whether it already exist
+    // TODO: this means it should be opened before to avoid repeating the condition in line 147
+
     let text_column_index = reader.select_one(args.text_column.as_ref().unwrap())?;
     let output = io::Output::new(&args.output);
     let model = args.model.unwrap_or_default();
@@ -180,6 +211,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
             writer.write_vector(&mut record, i)?;
         }
     }
+
     writer.finish()?;
 
     Ok(())

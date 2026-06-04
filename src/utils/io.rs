@@ -1,6 +1,6 @@
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{self, BufWriter, IsTerminal, Read, Seek, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use npyz::WriterBuilder;
@@ -206,6 +206,7 @@ pub struct Output {
     path: Option<PathBuf>,
     delimiter: u8,
     pub format: FileFormat,
+    append: bool,
 }
 
 impl Default for Output {
@@ -214,6 +215,7 @@ impl Default for Output {
             path: None,
             delimiter: b',',
             format: FileFormat::Csv,
+            append: false,
         }
     }
 }
@@ -234,17 +236,26 @@ impl Output {
         input
     }
 
+    fn open_file(&self, path: impl AsRef<Path>) -> io::Result<File> {
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(!self.append)
+            .append(self.append)
+            .open(path)
+    }
+
     pub fn writer(&self) -> io::Result<BoxedWriter> {
         match &self.path {
             None => Ok(Box::new(io::stdout())),
-            Some(path) => Ok(Box::new(File::create(path)?)),
+            Some(path) => Ok(Box::new(self.open_file(path)?)),
         }
     }
 
     pub fn seekable_writer(&self) -> io::Result<BoxedSeekableWriter> {
         match &self.path {
             None => Err(io::Error::other("cannot seek output")),
-            Some(path) => Ok(Box::new(File::create(path)?)),
+            Some(path) => Ok(Box::new(self.open_file(path)?)),
         }
     }
 

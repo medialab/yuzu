@@ -147,7 +147,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
 
     let mut session = Session::builder()
         .unwrap()
-        .with_optimization_level(GraphOptimizationLevel::Level1)
+        .with_optimization_level(GraphOptimizationLevel::Level3)
         .unwrap()
         .with_execution_providers([CPUExecutionProvider::default().build()])
         .unwrap()

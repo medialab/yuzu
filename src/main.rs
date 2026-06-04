@@ -49,6 +49,7 @@ macro_rules! impl_from_error {
     };
 }
 
+impl_from_error!(&str);
 impl_from_error!(Utf8Error);
 impl_from_error!(hf_hub::api::sync::ApiError);
 impl_from_error!(tokenizers::Error);

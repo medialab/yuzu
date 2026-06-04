@@ -53,6 +53,15 @@ pub struct TokenizeArgs {
     #[arg(short, long)]
     model: Option<EmbeddingModel>,
 
+    /// If given, will count the number of tokens instead. Cannot be used with --explode.
+    #[arg(long)]
+    count: bool,
+
+    /// Name of the column to append. Defaults to "tokens", or "token" when used with --explode
+    /// or "token_count" when used with --count.
+    #[arg(short, long)]
+    column: Option<String>,
+
     /// Separator to use when joining the tokens in the output. The default space character used to
     /// do so is usually safe since most models normalize spaces in the tokens for easier debugging.
     #[arg(long, default_value = " ")]
@@ -61,6 +70,11 @@ pub struct TokenizeArgs {
     /// Whether to keep the tokenized column.
     #[arg(short, long)]
     keep: bool,
+
+    /// If given, "explode" the output by priting a copy of the record per token. This can be
+    /// useful to compute aggregation at the token level. Cannot be used with --count.
+    #[arg(long)]
+    explode: bool,
 
     /// Path to output file. Will infer the format (CSV or numpy) depending on the extension (.csv or .npy)
     /// Will write in CSV to stdout if not given or if path is "-".
@@ -72,6 +86,10 @@ pub struct TokenizeArgs {
 }
 
 pub fn action(args: TokenizeArgs) -> CLIResult<()> {
+    if args.explode && args.count {
+        Err("--count is not compatible with --explode!")?;
+    }
+
     if args.list_models {
         print_models_list();
         return Ok(());
@@ -100,7 +118,21 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
 
     if reader.has_headers() {
         let mut new_headers: ByteRecord = out_sel.select(&headers).collect();
-        new_headers.push_field(b"tokens");
+
+        let new_column_name = match &args.column {
+            Some(name) => name.as_bytes(),
+            None => {
+                if args.count {
+                    &b"token_count"[..]
+                } else if args.explode {
+                    &b"token"[..]
+                } else {
+                    &b"tokens"[..]
+                }
+            }
+        };
+
+        new_headers.push_field(new_column_name);
 
         writer.write_byte_record(&new_headers)?;
     }
@@ -123,9 +155,22 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
         for (record, encoding) in records.iter_mut().zip(encodings.into_iter()) {
             let tokens = &encoding.get_tokens()[unpadded_range(&encoding, model.padding_direction)];
 
-            record.push_field(tokens.join(&args.sep).as_bytes());
+            if args.explode {
+                for token in tokens {
+                    record.truncate(out_sel.len());
+                    record.push_field(token.as_bytes());
 
-            writer.write_byte_record(record)?;
+                    writer.write_byte_record(record)?;
+                }
+            } else {
+                if args.count {
+                    record.fmt_field(&tokens.len());
+                } else {
+                    record.push_field(tokens.join(&args.sep).as_bytes());
+                }
+
+                writer.write_byte_record(record)?;
+            }
         }
     }
 

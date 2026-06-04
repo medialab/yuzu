@@ -35,11 +35,12 @@ fn unpadded_range(encoding: &Encoding, direction: PaddingDirection) -> Range<usi
 
 #[derive(Args, Debug)]
 pub struct TokenizeArgs {
+    /// CSV column containing the text to tokenize
     #[arg(
         required_unless_present = "list_models",
         conflicts_with = "list_models"
     )]
-    column: Option<Selector>,
+    text_column: Option<Selector>,
 
     /// Path to CSV file containing text to classify (will use stdin if not given or if path is "-").
     input: Option<String>,
@@ -76,7 +77,7 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
         .no_headers(args.common.no_headers)
         .csv_reader()?;
 
-    let column_index = reader.select_one(args.column.as_ref().unwrap())?;
+    let text_column_index = reader.select_one(args.text_column.as_ref().unwrap())?;
     let mut writer = io::Output::new(&args.output).csv_writer()?;
 
     if reader.has_headers() {
@@ -95,7 +96,7 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
 
         for result in chunk {
             let record = result?;
-            texts.push(from_utf8(&record[column_index])?.to_string());
+            texts.push(from_utf8(&record[text_column_index])?.to_string());
             records.push(record);
         }
 

@@ -91,11 +91,12 @@ fn encode(
 
 #[derive(Args, Debug)]
 pub struct EmbedArgs {
+    /// CSV column containing the text to embed
     #[arg(
         required_unless_present = "list_models",
         conflicts_with = "list_models"
     )]
-    column: Option<Selector>,
+    text_column: Option<Selector>,
 
     /// Path to CSV file containing text to classify (will use stdin if not given or if path is "-").
     input: Option<String>,
@@ -127,7 +128,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         .delimiter(args.common.delimiter)
         .no_headers(args.common.no_headers)
         .csv_reader()?;
-    let column_index = reader.select_one(args.column.as_ref().unwrap())?;
+    let text_column_index = reader.select_one(args.text_column.as_ref().unwrap())?;
     let output = io::Output::new(&args.output);
     let model = args.model.unwrap_or_default();
     let mut writer = output.vector_writer(model.dim)?;
@@ -164,7 +165,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         let mut records: Vec<ByteRecord> = Vec::new();
         for result in chunk.into_iter() {
             let record = result?;
-            let string = String::from_utf8(record[column_index].to_vec()).unwrap();
+            let string = String::from_utf8(record[text_column_index].to_vec()).unwrap();
             input.push(string);
             records.push(record);
         }

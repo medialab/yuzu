@@ -1,7 +1,9 @@
-use hf_hub::api::sync::{Api, ApiError};
+use hf_hub::api::sync::{Api, ApiError, ApiRepo};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use tokenizers::PaddingDirection;
+use tokenizers::{
+    Error as TokenizerError, PaddingDirection, PaddingParams, Tokenizer, TruncationParams,
+};
 
 use crate::utils::pooling;
 
@@ -109,27 +111,30 @@ impl EmbeddingModel {
         format!("https://huggingface.co/{}", self.model_id)
     }
 
+    fn repo(&self) -> Result<ApiRepo, ApiError> {
+        let api = Api::new()?;
+        Ok(api.model(self.model_id.clone()))
+    }
+
     pub fn paths(&self) -> Result<ModelPaths, ApiError> {
-        let (onnx_file, config_file, tokenizer_file) = match self.local {
-            true => (
+        let (onnx_file, config_file, tokenizer_file) = if self.local {
+            (
                 Path::new(&self.model_id).join(&self.onnx_file),
                 Path::new(&self.model_id).join(&self.config_file),
                 Path::new(&self.model_id).join(&self.tokenizer_file),
-            ),
-            false => {
-                let api = Api::new().unwrap();
-                let repo = api.model(self.model_id.clone());
+            )
+        } else {
+            let repo = self.repo()?;
 
-                if let Some(data_file) = &self.onnx_data_file {
-                    repo.get(data_file)?;
-                }
-
-                (
-                    repo.get(&self.onnx_file).unwrap(),
-                    repo.get(&self.config_file).unwrap(),
-                    repo.get(&self.tokenizer_file).unwrap(),
-                )
+            if let Some(data_file) = &self.onnx_data_file {
+                repo.get(data_file)?;
             }
+
+            (
+                repo.get(&self.onnx_file)?,
+                repo.get(&self.config_file)?,
+                repo.get(&self.tokenizer_file)?,
+            )
         };
 
         Ok(ModelPaths {
@@ -137,5 +142,32 @@ impl EmbeddingModel {
             config: config_file,
             tokenizer: tokenizer_file,
         })
+    }
+
+    pub fn tokenizer_path(&self) -> Result<PathBuf, ApiError> {
+        if self.local {
+            Ok(Path::new(&self.model_id).join(&self.tokenizer_file))
+        } else {
+            let repo = self.repo()?;
+            repo.get(&self.tokenizer_file)
+        }
+    }
+
+    pub fn tokenizer(&self, path: impl AsRef<Path>) -> Result<Tokenizer, TokenizerError> {
+        let padding = PaddingParams {
+            direction: self.padding_direction,
+            ..Default::default()
+        };
+
+        let truncation = TruncationParams {
+            max_length: self.max_length,
+            ..Default::default()
+        };
+
+        let mut tokenizer = Tokenizer::from_file(path)?;
+        tokenizer.with_padding(Some(padding));
+        tokenizer.with_truncation(Some(truncation))?;
+
+        Ok(tokenizer)
     }
 }

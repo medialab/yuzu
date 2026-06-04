@@ -132,16 +132,6 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
     let model = args.model.unwrap_or_default();
     let mut writer = output.vector_writer(model.dim)?;
 
-    let padding = tokenizers::PaddingParams {
-        direction: model.padding_direction,
-        ..Default::default()
-    };
-
-    let truncation = tokenizers::TruncationParams {
-        max_length: model.max_length,
-        ..Default::default()
-    };
-
     let model_files = model.paths()?;
 
     let config = File::open(model_files.config).expect("file should open read only");
@@ -152,9 +142,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         .expect("file should have model_type key")
         .as_str();
 
-    let mut tokenizer = Tokenizer::from_file(model_files.tokenizer).unwrap();
-    tokenizer.with_padding(Some(padding));
-    tokenizer.with_truncation(Some(truncation)).unwrap();
+    let tokenizer = model.tokenizer(&model_files.tokenizer)?;
 
     let mut session = Session::builder()
         .unwrap()

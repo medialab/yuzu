@@ -51,6 +51,7 @@ macro_rules! impl_from_error {
 
 impl_from_error!(Utf8Error);
 impl_from_error!(hf_hub::api::sync::ApiError);
+impl_from_error!(tokenizers::Error);
 
 pub type CLIResult<T> = Result<T, CLIError>;
 
@@ -102,6 +103,7 @@ impl ParallelizationArgs {
 enum Commands {
     Embed(commands::embed::EmbedArgs),
     Lang(commands::lang::LangArgs),
+    Tokenize(commands::tokenize::TokenizeArgs),
 }
 
 fn main() {
@@ -110,6 +112,7 @@ fn main() {
     let result = match args.command {
         Some(Commands::Embed(args)) => commands::embed::action(args),
         Some(Commands::Lang(args)) => commands::lang::action(args),
+        Some(Commands::Tokenize(args)) => commands::tokenize::action(args),
         None => Ok(()),
     };
 

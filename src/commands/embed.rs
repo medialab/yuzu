@@ -1,5 +1,6 @@
 use std::num::NonZeroUsize;
 use std::path::Path;
+use std::time::SystemTime;
 
 use clap::Args;
 use ndarray::{ArrayView1, Axis};
@@ -121,6 +122,10 @@ pub struct EmbedArgs {
     #[arg(long, requires = "output")]
     resume: bool,
 
+    /// Whether to print information about the embedding process in stderr
+    #[arg(short, long)]
+    verbose: bool,
+
     /// Path to output file. Will infer the format (CSV or numpy) depending on the extension (.csv or .npy)
     /// Will write in CSV to stdout if not given or if path is "-".
     #[arg(short, long)]
@@ -206,7 +211,19 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
             input.push(string);
             records.push(record);
         }
+
+        let timer_opt = args.verbose.then(SystemTime::now);
+
         let embedding = encode(input, &mut session, &tokenizer, &model, model_type);
+
+        if let Some(timer) = timer_opt {
+            eprintln!(
+                "Batch ({}) took {:?}",
+                args.chunk_size,
+                timer.elapsed().unwrap()
+            );
+        }
+
         for (i, mut record) in zip(&embedding, records) {
             writer.write_vector(&mut record, i)?;
         }

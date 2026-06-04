@@ -51,7 +51,7 @@ lto = false
 
 [dependencies]
 anyhow = "1.0.100"
-clap = { version = "4.5.51", features = ["color", "derive"] }
+clap = { version = "4.5.51", features = ["color", "derive", "wrap_help"] }
 colored = "3.1.1"
 flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
 hf-hub = "0.4.3"

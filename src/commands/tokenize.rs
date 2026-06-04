@@ -53,6 +53,11 @@ pub struct TokenizeArgs {
     #[arg(short, long)]
     model: Option<EmbeddingModel>,
 
+    /// Separator to use when joining the tokens in the output. The default space character used to
+    /// do so is usually safe since most models normalize spaces in the tokens for easier debugging.
+    #[arg(long, default_value = " ")]
+    sep: String,
+
     /// Path to output file. Will infer the format (CSV or numpy) depending on the extension (.csv or .npy)
     /// Will write in CSV to stdout if not given or if path is "-".
     #[arg(short, long)]
@@ -105,7 +110,7 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
         for (record, encoding) in records.iter_mut().zip(encodings.into_iter()) {
             let tokens = &encoding.get_tokens()[unpadded_range(&encoding, model.padding_direction)];
 
-            record.push_field(tokens.join(" ").as_bytes());
+            record.push_field(tokens.join(&args.sep).as_bytes());
 
             writer.write_byte_record(record)?;
         }

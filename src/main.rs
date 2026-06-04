@@ -98,6 +98,17 @@ impl ParallelizationArgs {
             None
         }
     }
+
+    fn build_rayon_global_thread_pool(&self) -> usize {
+        let threads = self.threads().unwrap_or(1);
+
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build_global()
+            .expect("could not build thread pool!");
+
+        threads
+    }
 }
 
 #[derive(Subcommand)]

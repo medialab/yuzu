@@ -15,7 +15,7 @@ use tokenizers::Tokenizer;
 use crate::utils::hf::{EmbeddingModel, print_models_list};
 use crate::utils::io;
 use crate::utils::iter::IteratorExt;
-use crate::{CLIResult, CommonArgs};
+use crate::{CLIResult, CommonArgs, ParallelizationArgs};
 
 fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
     let norm = vec.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -121,6 +121,9 @@ pub struct EmbedArgs {
     output: Option<String>,
 
     #[command(flatten)]
+    parallelization: ParallelizationArgs,
+
+    #[command(flatten)]
     common: CommonArgs,
 }
 
@@ -129,6 +132,8 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         print_models_list();
         return Ok(());
     }
+
+    let threads = args.parallelization.build_rayon_global_thread_pool();
 
     let mut reader = io::Input::new(&args.input)
         .delimiter(args.common.delimiter)
@@ -157,7 +162,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         .unwrap()
         .with_execution_providers([CPUExecutionProvider::default().build()])
         .unwrap()
-        .with_intra_threads(1)
+        .with_intra_threads(threads)
         .unwrap()
         .commit_from_file(model_files.onnx)
         .unwrap();

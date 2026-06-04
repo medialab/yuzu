@@ -8,7 +8,7 @@ use tokenizers::{Encoding, PaddingDirection};
 
 use crate::utils::hf::{EmbeddingModel, print_models_list};
 use crate::utils::{io, iter::IteratorExt};
-use crate::{CLIResult, CommonArgs};
+use crate::{CLIResult, CommonArgs, ParallelizationArgs};
 
 #[inline]
 fn unpadded_range(encoding: &Encoding, direction: PaddingDirection) -> Range<usize> {
@@ -87,6 +87,9 @@ pub struct TokenizeArgs {
     output: Option<String>,
 
     #[command(flatten)]
+    parallelization: ParallelizationArgs,
+
+    #[command(flatten)]
     common: CommonArgs,
 }
 
@@ -99,6 +102,8 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
         print_models_list();
         return Ok(());
     }
+
+    args.parallelization.build_rayon_global_thread_pool();
 
     let model = args.model.unwrap_or_default();
     let tokenizer_path = model.tokenizer_path()?;

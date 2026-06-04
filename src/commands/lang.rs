@@ -13,22 +13,29 @@ use crate::{CLIResult, CommonArgs, ParallelizationArgs};
 pub struct LangArgs {
     /// Column containing text to classify
     column: Selector,
+
     /// Path to input CSV file (will use stdin if not given or if path is "-").
     input: Option<String>,
+
     /// Whether to emit full English name of detected lang instead of ISO-639-3 code.
     #[arg(long)]
     full_name: bool,
+
     /// Name of the added column containing detected lang.
     #[arg(long, default_value = "lang")]
     lang_column: String,
+
     /// Default value to use when lang cannot be detected.
     #[arg(long, default_value = "")]
     default: String,
+
     /// Path to output file. Will write to stdout if not given or if path is "-".
     #[arg(short, long)]
     output: Option<String>,
+
     #[command(flatten)]
     parallelization: ParallelizationArgs,
+
     #[command(flatten)]
     common: CommonArgs,
 }

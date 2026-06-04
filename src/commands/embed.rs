@@ -10,7 +10,7 @@ use std::fs::File;
 use std::iter::zip;
 use tokenizers::Tokenizer;
 
-use crate::utils::hf::EmbeddingModel;
+use crate::utils::hf::{EmbeddingModel, print_models_list};
 use crate::utils::io;
 use crate::utils::iter::IteratorExt;
 use crate::{CLIResult, CommonArgs};
@@ -91,10 +91,18 @@ fn encode(
 
 #[derive(Args, Debug)]
 pub struct EmbedArgs {
-    column: Selector,
+    #[arg(
+        required_unless_present = "list_models",
+        conflicts_with = "list_models"
+    )]
+    column: Option<Selector>,
 
     /// Path to CSV file containing text to classify (will use stdin if not given or if path is "-").
     input: Option<String>,
+
+    /// If given, print a list of supported models then exit
+    #[arg(long)]
+    list_models: bool,
 
     /// Id of the model on HuggingFace. Defaults to ibm-granite/granite-embedding-107m-multilingual.
     #[arg(short, long)]
@@ -110,11 +118,16 @@ pub struct EmbedArgs {
 }
 
 pub fn action(args: EmbedArgs) -> CLIResult<()> {
+    if args.list_models {
+        print_models_list();
+        return Ok(());
+    }
+
     let mut reader = io::Input::new(&args.input)
         .delimiter(args.common.delimiter)
         .no_headers(args.common.no_headers)
         .csv_reader()?;
-    let column_index = reader.select_one(&args.column)?;
+    let column_index = reader.select_one(args.column.as_ref().unwrap())?;
     let output = io::Output::new(&args.output);
     let model = args.model.unwrap_or_default();
     let mut writer = output.vector_writer(model.dim)?;

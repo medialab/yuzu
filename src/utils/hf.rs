@@ -77,6 +77,27 @@ impl FromStr for EmbeddingModel {
     }
 }
 
+pub static SUPPORTED_MODELS: [&str; 3] = [
+    "ibm-granite/granite-embedding-107m-multilingual",
+    "Qwen/Qwen3-Embedding-0.6B",
+    "sentence-transformers/all-MiniLM-L6-v2",
+];
+
+pub fn print_models_list() {
+    use colored::Colorize;
+
+    for model_name in SUPPORTED_MODELS {
+        let model: EmbeddingModel = model_name.parse().unwrap();
+
+        println!("{}", model.model_id.cyan());
+        println!("url: {}", model.url().blue());
+        println!("dimensions: {}", model.dim.to_string().red());
+        println!("context window: {}", model.max_length.to_string().red());
+        println!("pooling: {}", model.pooling.as_str().green());
+        println!();
+    }
+}
+
 pub struct ModelPaths {
     pub onnx: PathBuf,
     pub config: PathBuf,
@@ -84,6 +105,10 @@ pub struct ModelPaths {
 }
 
 impl EmbeddingModel {
+    pub fn url(&self) -> String {
+        format!("https://huggingface.co/{}", self.model_id)
+    }
+
     pub fn paths(&self) -> Result<ModelPaths, ApiError> {
         let (onnx_file, config_file, tokenizer_file) = match self.local {
             true => (

@@ -8,6 +8,14 @@ pub enum Pooling {
 }
 
 impl Pooling {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Mean => "mean",
+            Self::LastToken => "last token",
+            Self::Cls => "cls",
+        }
+    }
+
     pub fn apply(
         self,
         last_hidden_state: &ArrayViewD<f32>,

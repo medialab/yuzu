@@ -81,3 +81,30 @@ fn embed_qwen3() {
         ])
         .approx_assert_csv_matrix(sentence_transformers_matrix, 1);
 }
+
+#[test]
+fn embed_scamembert_large() {
+    let sentence_transformers_matrix: Vec<Vec<f32>> = vec![
+        vec![-0.05212, 0.0173, 0.01896, -0.01351, 0.01649],
+        vec![-0.01889, 0.00863, 0.01378, 0.00936, -0.01691],
+        vec![-0.02984, 0.01591, 0.02304, -0.04085, 0.00493],
+        vec![-0.02, 0.01961, 0.02556, -0.02556, -0.02689],
+        vec![0.03461, -0.04637, -0.01099, 0.00888, -0.04564],
+        vec![0.04457, -0.04755, -0.00032, 0.04593, 0.01179],
+    ];
+
+    cmd()
+        .arg("embed")
+        .arg("sentence")
+        .args(["--model", "Lajavaness/sentence-camembert-large"])
+        .write_csv_stdin(&[
+            &["sentence"],
+            &["Yuzu is a citrus fruit and plant in the family Rutaceae of Chinese origin."],
+            &["Le yuzu est un agrume acide originaire de l'est de l'Asie."],
+            &["Yuzukoshō (柚子胡椒 / ゆずこしょう?, aussi yuzugoshō) est un type d'assaisonnement nippon."],
+            &["Yuzu koshō (柚子胡椒; also yuzu goshō) is a type of Japanese seasoning."],
+            &["Le Cochon est un documentaire français de moyen métrage coréalisé par Jean-Michel Barjol et Jean Eustache, sorti en 1970."],
+            &["Le Cochon ('The Pig') is a fifty-minute featurette co-directed by Jean Eustache and Jean-Michel Barjol in 1970."],
+        ])
+        .approx_assert_csv_matrix(sentence_transformers_matrix, 1);
+}

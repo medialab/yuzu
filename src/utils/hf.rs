@@ -66,6 +66,15 @@ impl FromStr for EmbeddingModel {
                 onnx_file: String::from("onnx/model.onnx"),
                 ..Default::default()
             }),
+            "Lajavaness/sentence-camembert-large" => Ok(EmbeddingModel {
+                model_id: String::from("Lajavaness/sentence-camembert-large"),
+                dim: 1024,
+                pooling: pooling::Pooling::Mean,
+                max_length: 256,
+                disk_size: String::from("1.3G"),
+                onnx_file: String::from("onnx/model_O2.onnx"),
+                ..Default::default()
+            }),
             // #[cfg(test)]
             "test-model" => Ok(EmbeddingModel {
                 model_id: String::from("local"),
@@ -83,10 +92,11 @@ impl FromStr for EmbeddingModel {
     }
 }
 
-pub static SUPPORTED_MODELS: [&str; 3] = [
+pub static SUPPORTED_MODELS: [&str; 4] = [
     "ibm-granite/granite-embedding-107m-multilingual",
     "Qwen/Qwen3-Embedding-0.6B",
     "sentence-transformers/all-MiniLM-L6-v2",
+    "Lajavaness/sentence-camembert-large",
 ];
 
 pub fn print_models_list() {

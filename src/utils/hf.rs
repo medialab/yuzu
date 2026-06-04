@@ -63,9 +63,8 @@ impl FromStr for EmbeddingModel {
             // #[cfg(test)]
             "test-model" => Ok(EmbeddingModel {
                 model_id: String::from("local"),
-                dim: 384,
-                pooling: pooling::Pooling::Cls,
-                onnx_file: String::from("onnx/model_qint8_arm64.onnx"),
+                pooling: pooling::Pooling::Mean,
+                onnx_file: String::from("onnx/model.onnx"),
                 max_length: 256,
                 local: true,
                 ..Default::default()

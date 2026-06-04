@@ -162,6 +162,24 @@ impl Input {
     pub fn csv_reader(&self) -> io::Result<simd_csv::Reader<BoxedReader>> {
         Ok(self.csv_reader_from_reader(self.reader()?))
     }
+
+    fn csv_splitter_builder(&self) -> simd_csv::SplitterBuilder {
+        let mut builder = simd_csv::SplitterBuilder::new();
+
+        builder
+            .delimiter(self.delimiter)
+            .has_headers(!self.no_headers);
+
+        builder
+    }
+
+    fn csv_splitter_from_reader<R: Read>(&self, reader: R) -> simd_csv::Splitter<R> {
+        self.csv_splitter_builder().from_reader(reader)
+    }
+
+    pub fn csv_splitter(&self) -> io::Result<simd_csv::Splitter<BoxedReader>> {
+        Ok(self.csv_splitter_from_reader(self.reader()?))
+    }
 }
 
 pub enum FileFormat {

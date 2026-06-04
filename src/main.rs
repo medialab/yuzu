@@ -26,12 +26,6 @@ impl From<io::Error> for CLIError {
     }
 }
 
-impl From<Utf8Error> for CLIError {
-    fn from(value: Utf8Error) -> Self {
-        Self::Custom(value.to_string())
-    }
-}
-
 impl From<simd_csv::Error> for CLIError {
     fn from(value: simd_csv::Error) -> Self {
         if !value.is_io_error() {
@@ -44,6 +38,19 @@ impl From<simd_csv::Error> for CLIError {
         }
     }
 }
+
+macro_rules! impl_from_error {
+    ($type: ty) => {
+        impl From<$type> for CLIError {
+            fn from(value: $type) -> Self {
+                Self::Custom(value.to_string())
+            }
+        }
+    };
+}
+
+impl_from_error!(Utf8Error);
+impl_from_error!(hf_hub::api::sync::ApiError);
 
 pub type CLIResult<T> = Result<T, CLIError>;
 

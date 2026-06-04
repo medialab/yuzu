@@ -1,4 +1,4 @@
-use hf_hub::api::sync::Api;
+use hf_hub::api::sync::{Api, ApiError};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use tokenizers::PaddingDirection;
@@ -84,29 +84,34 @@ pub struct ModelPaths {
     pub tokenizer: PathBuf,
 }
 
-pub fn get_model_files(model: &EmbeddingModel) -> ModelPaths {
-    let (onnx_file, config_file, tokenizer_file) = match model.local {
-        true => (
-            Path::new(&model.model_id).join(&model.onnx_file),
-            Path::new(&model.model_id).join(&model.config_file),
-            Path::new(&model.model_id).join(&model.tokenizer_file),
-        ),
-        false => {
-            let api = Api::new().unwrap();
-            let repo = api.model(model.model_id.clone());
-            if let Some(data_file) = model.onnx_data_file.clone() {
-                let _data_file = repo.get(&data_file);
+impl EmbeddingModel {
+    pub fn paths(&self) -> Result<ModelPaths, ApiError> {
+        let (onnx_file, config_file, tokenizer_file) = match self.local {
+            true => (
+                Path::new(&self.model_id).join(&self.onnx_file),
+                Path::new(&self.model_id).join(&self.config_file),
+                Path::new(&self.model_id).join(&self.tokenizer_file),
+            ),
+            false => {
+                let api = Api::new().unwrap();
+                let repo = api.model(self.model_id.clone());
+
+                if let Some(data_file) = &self.onnx_data_file {
+                    repo.get(data_file)?;
+                }
+
+                (
+                    repo.get(&self.onnx_file).unwrap(),
+                    repo.get(&self.config_file).unwrap(),
+                    repo.get(&self.tokenizer_file).unwrap(),
+                )
             }
-            (
-                repo.get(&model.onnx_file).unwrap(),
-                repo.get(&model.config_file).unwrap(),
-                repo.get(&model.tokenizer_file).unwrap(),
-            )
-        }
-    };
-    ModelPaths {
-        onnx: onnx_file,
-        config: config_file,
-        tokenizer: tokenizer_file,
+        };
+
+        Ok(ModelPaths {
+            onnx: onnx_file,
+            config: config_file,
+            tokenizer: tokenizer_file,
+        })
     }
 }

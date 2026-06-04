@@ -11,7 +11,6 @@ use std::iter::zip;
 use tokenizers::Tokenizer;
 
 use crate::utils::hf::EmbeddingModel;
-use crate::utils::hf::get_model_files;
 use crate::utils::io;
 use crate::utils::iter::IteratorExt;
 use crate::{CLIResult, CommonArgs};
@@ -130,7 +129,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         ..Default::default()
     };
 
-    let model_files = get_model_files(&model);
+    let model_files = model.paths()?;
 
     let config = File::open(model_files.config).expect("file should open read only");
     let json: serde_json::Value =

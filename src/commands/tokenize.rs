@@ -1,11 +1,37 @@
+use std::ops::Range;
 use std::str::from_utf8;
 
 use clap::Args;
 use simd_csv::Selector;
+use tokenizers::{Encoding, PaddingDirection};
 
 use crate::utils::hf::{EmbeddingModel, print_models_list};
 use crate::utils::{io, iter::IteratorExt};
 use crate::{CLIResult, CommonArgs};
+
+#[inline]
+fn unpadded_range(encoding: &Encoding, direction: PaddingDirection) -> Range<usize> {
+    match direction {
+        PaddingDirection::Right => {
+            let unpadded_len = encoding
+                .get_attention_mask()
+                .iter()
+                .position(|m| *m == 0)
+                .unwrap_or(encoding.len());
+
+            0..unpadded_len
+        }
+        PaddingDirection::Left => {
+            let first_unpadded_pos = encoding
+                .get_attention_mask()
+                .iter()
+                .position(|m| *m == 1)
+                .unwrap_or(encoding.len());
+
+            first_unpadded_pos..encoding.len()
+        }
+    }
+}
 
 #[derive(Args, Debug)]
 pub struct TokenizeArgs {
@@ -76,13 +102,7 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
         let encodings = tokenizer.encode_batch(texts, true)?;
 
         for (record, encoding) in records.iter_mut().zip(encodings.into_iter()) {
-            let unpadded_len = encoding
-                .get_attention_mask()
-                .iter()
-                .position(|m| *m == 0)
-                .unwrap_or(encoding.len());
-
-            let tokens = &encoding.get_tokens()[..unpadded_len];
+            let tokens = &encoding.get_tokens()[unpadded_range(&encoding, model.padding_direction)];
 
             record.push_field(tokens.join(" ").as_bytes());
 

@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use clap::Args;
 use ndarray::{ArrayView1, Axis};
 use ort::{
@@ -109,6 +111,10 @@ pub struct EmbedArgs {
     #[arg(short, long)]
     model: Option<EmbeddingModel>,
 
+    /// Chunk size in number of rows.
+    #[arg(long, default_value = "32")]
+    chunk_size: NonZeroUsize,
+
     /// Path to output file. Will infer the format (CSV or numpy) depending on the extension (.csv or .npy)
     /// Will write in CSV to stdout if not given or if path is "-".
     #[arg(short, long)]
@@ -160,7 +166,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         writer.write_headers(reader.byte_headers()?, model.dim, "dim_")?;
     }
 
-    for chunk in reader.into_byte_records().chunks(32) {
+    for chunk in reader.into_byte_records().chunks(args.chunk_size.get()) {
         let mut input: Vec<String> = Vec::new();
         let mut records: Vec<ByteRecord> = Vec::new();
         for result in chunk.into_iter() {

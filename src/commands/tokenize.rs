@@ -1,3 +1,4 @@
+use std::num::NonZeroUsize;
 use std::ops::Range;
 use std::str::from_utf8;
 
@@ -52,6 +53,10 @@ pub struct TokenizeArgs {
     /// Id of the model on HuggingFace. Defaults to ibm-granite/granite-embedding-107m-multilingual.
     #[arg(short, long)]
     model: Option<EmbeddingModel>,
+
+    /// Chunk size in number of rows.
+    #[arg(long, default_value = "32")]
+    chunk_size: NonZeroUsize,
 
     /// If given, will count the number of tokens instead. Cannot be used with --explode.
     #[arg(long)]
@@ -139,7 +144,7 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
 
     let mut records = Vec::new();
 
-    for chunk in reader.into_byte_records().chunks(32) {
+    for chunk in reader.into_byte_records().chunks(args.chunk_size.get()) {
         records.clear();
 
         let mut texts = Vec::with_capacity(chunk.len());

@@ -8,7 +8,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-          - os: windows-2025-vs2026
+          - os: windows-latest
           - os: macos-latest
           - os: ubuntu-24.04-arm
     runs-on: ${{ matrix.os }}
@@ -22,4 +22,6 @@ jobs:
           echo After override
           rustup --version
       - name: Tests
+        env:
+          RUSTFLAGS: "-C target-feature=-crt-static"
         run: cargo test

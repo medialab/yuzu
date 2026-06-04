@@ -1978,7 +1978,7 @@ checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
 [[package]]
 name = "simd-csv"
 version = "0.13.0"
-source = "git+https://github.com/medialab/simd-csv?rev=0b006c4d#0b006c4d3c9439d434569d5b3cfbed6559784c58"
+source = "git+https://github.com/medialab/simd-csv?rev=f412ea48#f412ea48a3105a820d30ee770a97fb3ff77a79a8"
 dependencies = [
  "memchr",
 ]

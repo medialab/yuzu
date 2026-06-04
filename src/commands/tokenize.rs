@@ -2,7 +2,7 @@ use std::ops::Range;
 use std::str::from_utf8;
 
 use clap::Args;
-use simd_csv::Selector;
+use simd_csv::{ByteRecord, Selection, Selector};
 use tokenizers::{Encoding, PaddingDirection};
 
 use crate::utils::hf::{EmbeddingModel, print_models_list};
@@ -58,6 +58,10 @@ pub struct TokenizeArgs {
     #[arg(long, default_value = " ")]
     sep: String,
 
+    /// Whether to keep the tokenized column.
+    #[arg(short, long)]
+    keep: bool,
+
     /// Path to output file. Will infer the format (CSV or numpy) depending on the extension (.csv or .npy)
     /// Will write in CSV to stdout if not given or if path is "-".
     #[arg(short, long)]
@@ -82,11 +86,20 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
         .no_headers(args.common.no_headers)
         .csv_reader()?;
 
+    let headers = reader.byte_headers()?.clone();
+
     let text_column_index = reader.select_one(args.text_column.as_ref().unwrap())?;
+
+    let out_sel = if args.keep {
+        Selection::full(headers.len())
+    } else {
+        Selection::without(text_column_index, headers.len())
+    };
+
     let mut writer = io::Output::new(&args.output).csv_writer()?;
 
     if reader.has_headers() {
-        let mut new_headers = reader.byte_headers()?.clone();
+        let mut new_headers: ByteRecord = out_sel.select(&headers).collect();
         new_headers.push_field(b"tokens");
 
         writer.write_byte_record(&new_headers)?;
@@ -102,7 +115,7 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
         for result in chunk {
             let record = result?;
             texts.push(from_utf8(&record[text_column_index])?.to_string());
-            records.push(record);
+            records.push(out_sel.select(&record).collect::<ByteRecord>());
         }
 
         let encodings = tokenizer.encode_batch(texts, true)?;

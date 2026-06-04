@@ -1,5 +1,7 @@
+use std::str::from_utf8;
+
 use clap::Args;
-use simd_csv::{ByteRecord, Selector};
+use simd_csv::Selector;
 
 use crate::utils::hf::{EmbeddingModel, print_models_list};
 use crate::utils::{io, iter::IteratorExt};
@@ -49,16 +51,42 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
         .csv_reader()?;
 
     let column_index = reader.select_one(args.column.as_ref().unwrap())?;
-    let output = io::Output::new(&args.output);
+    let mut writer = io::Output::new(&args.output).csv_writer()?;
 
-    let mut texts = Vec::new();
+    if reader.has_headers() {
+        let mut new_headers = reader.byte_headers()?.clone();
+        new_headers.push_field(b"tokens");
+
+        writer.write_byte_record(&new_headers)?;
+    }
+
+    let mut records = Vec::new();
 
     for chunk in reader.into_byte_records().chunks(32) {
-        texts.clear();
+        records.clear();
+
+        let mut texts = Vec::with_capacity(chunk.len());
 
         for result in chunk {
             let record = result?;
-            texts.push(record[column_index].to_vec());
+            texts.push(from_utf8(&record[column_index])?.to_string());
+            records.push(record);
+        }
+
+        let encodings = tokenizer.encode_batch(texts, true)?;
+
+        for (record, encoding) in records.iter_mut().zip(encodings.into_iter()) {
+            let unpadded_len = encoding
+                .get_attention_mask()
+                .iter()
+                .position(|m| *m == 0)
+                .unwrap_or(encoding.len());
+
+            let tokens = &encoding.get_tokens()[..unpadded_len];
+
+            record.push_field(tokens.join(" ").as_bytes());
+
+            writer.write_byte_record(record)?;
         }
     }
 

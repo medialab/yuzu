@@ -14,6 +14,7 @@ pub struct EmbeddingModel {
     pub padding_direction: PaddingDirection,
     pub pooling: pooling::Pooling,
     pub max_length: usize,
+    pub disk_size: String,
     onnx_file: String,
     config_file: String,
     tokenizer_file: String,
@@ -29,6 +30,7 @@ impl Default for EmbeddingModel {
             padding_direction: PaddingDirection::Right,
             pooling: pooling::Pooling::Cls,
             max_length: 512,
+            disk_size: String::from("417M"),
             onnx_file: String::from("model.onnx"),
             config_file: String::from("config.json"),
             tokenizer_file: String::from("tokenizer.json"),
@@ -50,6 +52,7 @@ impl FromStr for EmbeddingModel {
                 padding_direction: PaddingDirection::Left,
                 pooling: pooling::Pooling::LastToken,
                 max_length: 8192,
+                disk_size: String::from("1.2G"),
                 onnx_file: String::from("onnx/model.onnx"),
                 onnx_data_file: Some(String::from("onnx/model.onnx_data")),
                 ..Default::default()
@@ -59,6 +62,7 @@ impl FromStr for EmbeddingModel {
                 dim: 384,
                 pooling: pooling::Pooling::Mean,
                 max_length: 256,
+                disk_size: String::from("174M"),
                 onnx_file: String::from("onnx/model.onnx"),
                 ..Default::default()
             }),
@@ -94,6 +98,7 @@ pub fn print_models_list() {
         println!("{}", model.model_id.cyan());
         println!("url: {}", model.url().blue());
         println!("dimensions: {}", model.dim.to_string().red());
+        println!("size on disk: {}", model.disk_size.purple());
         println!("context window: {}", model.max_length.to_string().red());
         println!("pooling: {}", model.pooling.as_str().green());
         println!();

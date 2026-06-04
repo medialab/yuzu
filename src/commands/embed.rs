@@ -156,16 +156,11 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
 
     let tokenizer = model.tokenizer(&model_files.tokenizer)?;
 
-    let mut session = Session::builder()
-        .unwrap()
-        .with_optimization_level(GraphOptimizationLevel::Level3)
-        .unwrap()
-        .with_execution_providers([CPUExecutionProvider::default().build()])
-        .unwrap()
-        .with_intra_threads(threads)
-        .unwrap()
-        .commit_from_file(model_files.onnx)
-        .unwrap();
+    let mut session = Session::builder()?
+        .with_optimization_level(GraphOptimizationLevel::Level3)?
+        .with_execution_providers([CPUExecutionProvider::default().build()])?
+        .with_intra_threads(threads)?
+        .commit_from_file(model_files.onnx)?;
 
     if reader.has_headers() {
         writer.write_headers(reader.byte_headers()?, model.dim, "dim_")?;

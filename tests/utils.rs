@@ -51,7 +51,7 @@ impl YuzuCommand {
     }
 
     #[allow(dead_code)]
-    pub fn assert_csv_matrix(&mut self, data: Vec<Vec<f32>>, offset: usize) {
+    pub fn approx_assert_csv_matrix(&mut self, data: Vec<Vec<f32>>, offset: usize) {
         let assert = self.0.assert().success();
 
         let reader = simd_csv::ReaderBuilder::new()

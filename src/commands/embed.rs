@@ -208,8 +208,8 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
     }
 
     for batch in reader.into_byte_records().chunks(args.batch_size.get()) {
-        let mut input_batch: Vec<String> = Vec::new();
-        let mut records: Vec<ByteRecord> = Vec::new();
+        let mut input_batch: Vec<String> = Vec::with_capacity(batch.len());
+        let mut records: Vec<ByteRecord> = Vec::with_capacity(batch.len());
         for row in batch.into_iter() {
             let record = row?;
             let string = String::from_utf8(record[text_column_index].to_vec()).unwrap();
@@ -225,16 +225,16 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
             sort_indices.sort_unstable_by_key(|&i| input_batch[i].len());
         }
 
-        let mut embeddings: Vec<Vec<f32>> = Vec::new();
+        let mut embeddings: Vec<Vec<f32>> = Vec::with_capacity(input_batch.len());
 
         for idx_chunk in sort_indices.chunks(args.chunk_size.get()) {
             let timer_opt = args.verbose.then(SystemTime::now);
 
             let input: Vec<&str> = idx_chunk.iter().map(|&i| input_batch[i].as_str()).collect();
             let embedding = encode(input, &mut session, &tokenizer, &model, model_type);
-            for e in embedding.into_iter() {
-                embeddings.push(e);
-            }
+
+            embeddings.extend(embedding);
+
             if let Some(timer) = timer_opt {
                 eprintln!(
                     "Batch ({}) took {:?}",

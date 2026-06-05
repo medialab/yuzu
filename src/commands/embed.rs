@@ -149,6 +149,10 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         return Ok(());
     }
 
+    if args.chunk_size > args.batch_size {
+        Err("--chunk_size should be smaller than --batch-size.")?;
+    }
+
     let threads = args.parallelization.build_rayon_global_thread_pool();
 
     let rows_to_skip_when_resuming = if args.resume {

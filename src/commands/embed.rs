@@ -218,7 +218,12 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         }
 
         let mut sort_indices = (0..input_batch.len()).collect::<Vec<_>>();
-        sort_indices.par_sort_unstable_by_key(|&i| input_batch[i].len());
+
+        if threads > 1 {
+            sort_indices.par_sort_unstable_by_key(|&i| input_batch[i].len());
+        } else {
+            sort_indices.sort_unstable_by_key(|&i| input_batch[i].len());
+        }
 
         let mut embeddings: Vec<Vec<f32>> = Vec::new();
 

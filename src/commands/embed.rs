@@ -9,6 +9,7 @@ use ort::{
     session::{Session, builder::GraphOptimizationLevel},
     value::TensorRef,
 };
+use rayon::prelude::*;
 use simd_csv::{ByteRecord, Selector};
 use std::fs::File;
 use std::iter::zip;
@@ -30,7 +31,7 @@ fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
 }
 
 fn encode(
-    input: Vec<String>,
+    input: Vec<&str>,
     session: &mut Session,
     tokenizer: &Tokenizer,
     model: &EmbeddingModel,
@@ -114,9 +115,13 @@ pub struct EmbedArgs {
     #[arg(short, long)]
     model: Option<EmbeddingModel>,
 
-    /// Chunk size in number of rows.
-    #[arg(long, default_value = "32")]
+    /// Chunk size in number of rows. Rows in the same chunk are encoded simultaneously.
+    #[arg(long, default_value = "16")]
     chunk_size: NonZeroUsize,
+
+    /// Batch size in number of rows. Rows in the same batch are loaded in memory together and sorted on text length.
+    #[arg(long, default_value = "2048")]
+    batch_size: NonZeroUsize,
 
     /// Whether to resume from an aborted run. Requires -o/--output to be given.
     #[arg(long, requires = "output")]
@@ -202,33 +207,42 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         writer.write_headers(reader.byte_headers()?, model.dim, "dim_")?;
     }
 
-    for chunk in reader.into_byte_records().chunks(args.chunk_size.get()) {
-        let mut input: Vec<String> = Vec::new();
+    for batch in reader.into_byte_records().chunks(args.batch_size.get()) {
+        let mut input_batch: Vec<String> = Vec::new();
         let mut records: Vec<ByteRecord> = Vec::new();
-        for result in chunk.into_iter() {
-            let record = result?;
+        for row in batch.into_iter() {
+            let record = row?;
             let string = String::from_utf8(record[text_column_index].to_vec()).unwrap();
-            input.push(string);
+            input_batch.push(string);
             records.push(record);
         }
 
-        let timer_opt = args.verbose.then(SystemTime::now);
+        let mut sort_indices = (0..input_batch.len()).collect::<Vec<_>>();
+        sort_indices.par_sort_unstable_by_key(|&i| input_batch[i].len());
 
-        let embedding = encode(input, &mut session, &tokenizer, &model, model_type);
+        let mut embeddings: Vec<Vec<f32>> = Vec::new();
 
-        if let Some(timer) = timer_opt {
-            eprintln!(
-                "Batch ({}) took {:?}",
-                args.chunk_size,
-                timer.elapsed().unwrap()
-            );
+        for idx_chunk in sort_indices.chunks(args.chunk_size.get()) {
+            let timer_opt = args.verbose.then(SystemTime::now);
+
+            let input: Vec<&str> = idx_chunk.iter().map(|&i| input_batch[i].as_str()).collect();
+            let embedding = encode(input, &mut session, &tokenizer, &model, model_type);
+            for e in embedding.into_iter() {
+                embeddings.push(e);
+            }
+            if let Some(timer) = timer_opt {
+                eprintln!(
+                    "Batch ({}) took {:?}",
+                    args.chunk_size,
+                    timer.elapsed().unwrap()
+                );
+            }
         }
 
-        for (i, mut record) in zip(&embedding, records) {
-            writer.write_vector(&mut record, i)?;
+        for (i, mut record) in zip(&sort_indices, records) {
+            writer.write_vector(&mut record, &embeddings[*i])?;
         }
     }
-
     writer.finish()?;
 
     Ok(())

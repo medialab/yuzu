@@ -147,9 +147,9 @@ impl EmbeddingModel {
     pub fn paths(&self) -> Result<ModelPaths, ApiError> {
         let (onnx_file, config_file, tokenizer_file) = if self.local {
             (
-                Path::new(&self.model_id).join(&self.onnx_file),
-                Path::new(&self.model_id).join(&self.config_file),
-                Path::new(&self.model_id).join(&self.tokenizer_file),
+                Path::new(&self.model_id).join(self.onnx_file),
+                Path::new(&self.model_id).join(self.config_file),
+                Path::new(&self.model_id).join(self.tokenizer_file),
             )
         } else {
             let repo = self.repo()?;
@@ -159,9 +159,9 @@ impl EmbeddingModel {
             }
 
             (
-                repo.get(&self.onnx_file)?,
-                repo.get(&self.config_file)?,
-                repo.get(&self.tokenizer_file)?,
+                repo.get(self.onnx_file)?,
+                repo.get(self.config_file)?,
+                repo.get(self.tokenizer_file)?,
             )
         };
 
@@ -174,10 +174,10 @@ impl EmbeddingModel {
 
     pub fn tokenizer_path(&self) -> Result<PathBuf, ApiError> {
         if self.local {
-            Ok(Path::new(&self.model_id).join(&self.tokenizer_file))
+            Ok(Path::new(&self.model_id).join(self.tokenizer_file))
         } else {
             let repo = self.repo()?;
-            repo.get(&self.tokenizer_file)
+            repo.get(self.tokenizer_file)
         }
     }
 

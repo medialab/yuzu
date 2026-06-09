@@ -1,6 +1,7 @@
 use std::ffi;
 use std::io::Cursor;
 
+use approx::assert_abs_diff_eq;
 use assert_cmd::{Command, cargo_bin_cmd};
 use simd_csv::{ByteRecord, Writer};
 
@@ -51,30 +52,31 @@ impl YuzuCommand {
     }
 
     #[allow(dead_code)]
-    pub fn approx_assert_csv_matrix(&mut self, data: Vec<Vec<f32>>, offset: usize) {
+    pub fn approx_assert_csv_matrix(&mut self, expected: Vec<Vec<f32>>, offset: usize) {
         let assert = self.0.assert().success();
 
         let reader = simd_csv::ReaderBuilder::new()
             .has_headers(false)
             .from_reader(Cursor::new(&assert.get_output().stdout));
 
-        let records: Vec<Vec<f32>> = reader
-            .into_byte_records()
+        let observed = reader
+            .into_records()
             .skip(1)
-            .map(|record| {
-                record
-                    .unwrap()
+            .map(|r| {
+                r.unwrap()
                     .into_iter()
                     .skip(offset)
                     .take(5)
-                    .map(|cell| {
-                        let x = std::str::from_utf8(cell).unwrap().parse::<f32>().unwrap();
-                        (x * 100_000.0).round() / 100_000.0
-                    })
+                    .map(|cell| cell.parse::<f32>().unwrap())
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
-        assert_eq!(records, data);
+
+        assert_eq!(observed.len(), expected.len());
+
+        for (a, b) in observed.iter().zip(expected.iter()) {
+            assert_abs_diff_eq!(a.as_slice(), b.as_slice(), epsilon = 1e-5);
+        }
     }
 
     #[allow(dead_code)]

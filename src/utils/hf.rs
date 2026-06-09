@@ -5,14 +5,15 @@ use tokenizers::{
     Error as TokenizerError, PaddingDirection, PaddingParams, Tokenizer, TruncationParams,
 };
 
-use crate::utils::pooling;
+use crate::utils::pooling::Pooling;
 
 #[derive(Debug, Clone)]
 pub struct EmbeddingModel {
     model_id: &'static str,
+    alias: Option<&'static str>,
     pub dim: u64,
     pub padding_direction: PaddingDirection,
-    pub pooling: pooling::Pooling,
+    pub pooling: Pooling,
     pub max_length: usize,
     pub disk_size: &'static str,
     onnx_file: &'static str,
@@ -26,9 +27,10 @@ impl Default for EmbeddingModel {
     fn default() -> Self {
         Self {
             model_id: "ibm-granite/granite-embedding-107m-multilingual",
+            alias: Some("granite"),
             dim: 384,
             padding_direction: PaddingDirection::Right,
-            pooling: pooling::Pooling::Cls,
+            pooling: Pooling::Cls,
             max_length: 512,
             disk_size: "417M",
             onnx_file: "model.onnx",
@@ -45,31 +47,34 @@ impl FromStr for EmbeddingModel {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "ibm-granite/granite-embedding-107m-multilingual" => Ok(Default::default()),
-            "Qwen/Qwen3-Embedding-0.6B" => Ok(EmbeddingModel {
+            "granite" | "ibm-granite/granite-embedding-107m-multilingual" => Ok(Default::default()),
+            "qwen" | "Qwen/Qwen3-Embedding-0.6B" => Ok(EmbeddingModel {
                 model_id: "medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX",
+                alias: Some("qwen"),
                 dim: 1024,
                 padding_direction: PaddingDirection::Left,
-                pooling: pooling::Pooling::LastToken,
+                pooling: Pooling::LastToken,
                 max_length: 8192,
                 disk_size: "1.2G",
                 onnx_file: "onnx/model.onnx",
                 onnx_data_file: Some("onnx/model.onnx_data"),
                 ..Default::default()
             }),
-            "sentence-transformers/all-MiniLM-L6-v2" => Ok(EmbeddingModel {
+            "mini" | "sentence-transformers/all-MiniLM-L6-v2" => Ok(EmbeddingModel {
                 model_id: "sentence-transformers/all-MiniLM-L6-v2",
+                alias: Some("mini"),
                 dim: 384,
-                pooling: pooling::Pooling::Mean,
+                pooling: Pooling::Mean,
                 max_length: 256,
                 disk_size: "174M",
                 onnx_file: "onnx/model.onnx",
                 ..Default::default()
             }),
-            "Lajavaness/sentence-camembert-large" => Ok(EmbeddingModel {
+            "camembert" | "Lajavaness/sentence-camembert-large" => Ok(EmbeddingModel {
                 model_id: "Lajavaness/sentence-camembert-large",
+                alias: Some("camembert"),
                 dim: 1024,
-                pooling: pooling::Pooling::Mean,
+                pooling: Pooling::Mean,
                 max_length: 256,
                 disk_size: "1.3G",
                 onnx_file: "onnx/model_O2.onnx",
@@ -78,7 +83,7 @@ impl FromStr for EmbeddingModel {
             // #[cfg(test)]
             "test-model" => Ok(EmbeddingModel {
                 model_id: "local",
-                pooling: pooling::Pooling::Mean,
+                pooling: Pooling::Mean,
                 onnx_file: "onnx/model.onnx",
                 max_length: 256,
                 local: true,
@@ -105,7 +110,15 @@ pub fn print_models_list() {
     for model_name in SUPPORTED_MODELS {
         let model: EmbeddingModel = model_name.parse().unwrap();
 
-        println!("{}", model.model_id.cyan());
+        println!(
+            "{}{}",
+            model.model_id.cyan(),
+            if let Some(name) = model.alias {
+                format!(" ({})", name)
+            } else {
+                "".to_string()
+            }
+        );
         println!("url: {}", model.url().blue());
         println!("dimensions: {}", model.dim.to_string().red());
         println!("size on disk: {}", model.disk_size.purple());

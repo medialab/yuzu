@@ -9,31 +9,31 @@ use crate::utils::pooling;
 
 #[derive(Debug, Clone)]
 pub struct EmbeddingModel {
-    model_id: String,
+    model_id: &'static str,
     pub dim: u64,
     pub padding_direction: PaddingDirection,
     pub pooling: pooling::Pooling,
     pub max_length: usize,
-    pub disk_size: String,
-    onnx_file: String,
-    config_file: String,
-    tokenizer_file: String,
-    onnx_data_file: Option<String>,
+    pub disk_size: &'static str,
+    onnx_file: &'static str,
+    config_file: &'static str,
+    tokenizer_file: &'static str,
+    onnx_data_file: Option<&'static str>,
     local: bool,
 }
 
 impl Default for EmbeddingModel {
     fn default() -> Self {
         Self {
-            model_id: String::from("ibm-granite/granite-embedding-107m-multilingual"),
+            model_id: "ibm-granite/granite-embedding-107m-multilingual",
             dim: 384,
             padding_direction: PaddingDirection::Right,
             pooling: pooling::Pooling::Cls,
             max_length: 512,
-            disk_size: String::from("417M"),
-            onnx_file: String::from("model.onnx"),
-            config_file: String::from("config.json"),
-            tokenizer_file: String::from("tokenizer.json"),
+            disk_size: "417M",
+            onnx_file: "model.onnx",
+            config_file: "config.json",
+            tokenizer_file: "tokenizer.json",
             onnx_data_file: None,
             local: false,
         }
@@ -47,39 +47,39 @@ impl FromStr for EmbeddingModel {
         match value {
             "ibm-granite/granite-embedding-107m-multilingual" => Ok(Default::default()),
             "Qwen/Qwen3-Embedding-0.6B" => Ok(EmbeddingModel {
-                model_id: String::from("medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX"),
+                model_id: "medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX",
                 dim: 1024,
                 padding_direction: PaddingDirection::Left,
                 pooling: pooling::Pooling::LastToken,
                 max_length: 8192,
-                disk_size: String::from("1.2G"),
-                onnx_file: String::from("onnx/model.onnx"),
-                onnx_data_file: Some(String::from("onnx/model.onnx_data")),
+                disk_size: "1.2G",
+                onnx_file: "onnx/model.onnx",
+                onnx_data_file: Some("onnx/model.onnx_data"),
                 ..Default::default()
             }),
             "sentence-transformers/all-MiniLM-L6-v2" => Ok(EmbeddingModel {
-                model_id: String::from("sentence-transformers/all-MiniLM-L6-v2"),
+                model_id: "sentence-transformers/all-MiniLM-L6-v2",
                 dim: 384,
                 pooling: pooling::Pooling::Mean,
                 max_length: 256,
-                disk_size: String::from("174M"),
-                onnx_file: String::from("onnx/model.onnx"),
+                disk_size: "174M",
+                onnx_file: "onnx/model.onnx",
                 ..Default::default()
             }),
             "Lajavaness/sentence-camembert-large" => Ok(EmbeddingModel {
-                model_id: String::from("Lajavaness/sentence-camembert-large"),
+                model_id: "Lajavaness/sentence-camembert-large",
                 dim: 1024,
                 pooling: pooling::Pooling::Mean,
                 max_length: 256,
-                disk_size: String::from("1.3G"),
-                onnx_file: String::from("onnx/model_O2.onnx"),
+                disk_size: "1.3G",
+                onnx_file: "onnx/model_O2.onnx",
                 ..Default::default()
             }),
             // #[cfg(test)]
             "test-model" => Ok(EmbeddingModel {
-                model_id: String::from("local"),
+                model_id: "local",
                 pooling: pooling::Pooling::Mean,
-                onnx_file: String::from("onnx/model.onnx"),
+                onnx_file: "onnx/model.onnx",
                 max_length: 256,
                 local: true,
                 ..Default::default()
@@ -128,7 +128,7 @@ impl EmbeddingModel {
 
     fn repo(&self) -> Result<ApiRepo, ApiError> {
         let api = Api::new()?;
-        Ok(api.model(self.model_id.clone()))
+        Ok(api.model(self.model_id.to_string()))
     }
 
     pub fn paths(&self) -> Result<ModelPaths, ApiError> {

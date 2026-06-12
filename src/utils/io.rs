@@ -1,5 +1,6 @@
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufWriter, IsTerminal, Read, Seek, Write};
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -19,6 +20,29 @@ pub type BoxedSeekableWriter = Box<dyn SeekWrite + Send + 'static>;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Delimiter(u8);
+
+#[derive(Debug, Clone, Copy)]
+pub enum DynamicUsize {
+    Unlimited,
+    Limited(NonZeroUsize),
+}
+
+impl FromStr for DynamicUsize {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            r"-1" => Ok(DynamicUsize::Unlimited),
+            v => match NonZeroUsize::from_str(v) {
+                Ok(i) => Ok(DynamicUsize::Limited(i)),
+                Err(_) => {
+                    let msg = "--batch-size should be strictly positive or equal to -1".to_string();
+                    Err(msg)
+                }
+            },
+        }
+    }
+}
 
 impl Delimiter {
     pub fn as_byte(self) -> u8 {

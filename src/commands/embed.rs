@@ -17,6 +17,7 @@ use tokenizers::Tokenizer;
 
 use crate::utils::hf::{EmbeddingModel, print_models_list};
 use crate::utils::io;
+use crate::utils::io::DynamicUsize;
 use crate::utils::iter::IteratorExt;
 use crate::utils::readers::ReaderExt;
 use crate::{CLIResult, CommonArgs, ParallelizationArgs};
@@ -120,8 +121,8 @@ pub struct EmbedArgs {
     chunk_size: NonZeroUsize,
 
     /// Batch size in number of rows. Rows in the same batch are loaded in memory together and sorted on text length.
-    #[arg(long, default_value = "2048")]
-    batch_size: NonZeroUsize,
+    #[arg(long, default_value = "2048", allow_hyphen_values = true)]
+    batch_size: DynamicUsize,
 
     /// Whether to resume from an aborted run. Requires -o/--output to be given.
     #[arg(long, requires = "output")]
@@ -149,8 +150,10 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         return Ok(());
     }
 
-    if args.chunk_size > args.batch_size {
-        Err("--chunk_size should be smaller than --batch-size.")?;
+    if let DynamicUsize::Limited(size) = args.batch_size {
+        if args.chunk_size > size {
+            Err("--chunk-size should be smaller than --batch-size")?;
+        }
     }
 
     let threads = args.parallelization.build_rayon_global_thread_pool();
@@ -211,7 +214,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         writer.write_headers(reader.byte_headers()?, model.dim, "dim_")?;
     }
 
-    for batch in reader.into_byte_records().chunks(args.batch_size.get()) {
+    for batch in reader.into_byte_records().chunks_or_total(args.batch_size) {
         let mut input_batch: Vec<String> = Vec::with_capacity(batch.len());
         let mut records: Vec<ByteRecord> = Vec::with_capacity(batch.len());
         for row in batch.into_iter() {

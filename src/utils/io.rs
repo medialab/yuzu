@@ -224,13 +224,17 @@ impl FileFormat {
             None => Self::Csv,
         }
     }
+
+    fn is_csv(&self) -> bool {
+        matches!(self, Self::Csv)
+    }
 }
 
 pub struct Output {
     path: Option<PathBuf>,
     delimiter: u8,
     pub format: FileFormat,
-    append: bool,
+    pub can_resume: bool,
 }
 
 impl Default for Output {
@@ -239,7 +243,7 @@ impl Default for Output {
             path: None,
             delimiter: b',',
             format: FileFormat::Csv,
-            append: false,
+            can_resume: false,
         }
     }
 }
@@ -260,13 +264,38 @@ impl Output {
         input
     }
 
+    pub fn maybe_resume(path_opt: &Option<String>, resume: bool) -> io::Result<Self> {
+        let mut output = Self::new(path_opt);
+
+        if resume {
+            if !output.format.is_csv() {
+                return Err(io::Error::other("can only resume CSV output!"));
+            }
+
+            output.can_resume = output.exists_and_nonempty()?;
+        }
+
+        Ok(output)
+    }
+
+    fn exists_and_nonempty(&self) -> io::Result<bool> {
+        match &self.path {
+            None => Ok(false),
+            Some(path) => Ok(path.is_file() && path.metadata()?.len() > 0),
+        }
+    }
+
     fn open_file(&self, path: impl AsRef<Path>) -> io::Result<File> {
-        OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(!self.append)
-            .append(self.append)
-            .open(path)
+        if self.can_resume {
+            OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .append(true)
+                .open(path)
+        } else {
+            File::create(path)
+        }
     }
 
     pub fn writer(&self) -> io::Result<BoxedWriter> {

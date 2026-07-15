@@ -16,8 +16,7 @@ use std::iter::zip;
 use tokenizers::Tokenizer;
 
 use crate::utils::hf::{EmbeddingModel, print_models_list};
-use crate::utils::io;
-use crate::utils::io::DynamicUsize;
+use crate::utils::io::{DynamicUsize, Input, Output};
 use crate::utils::iter::IteratorExt;
 use crate::utils::readers::ReaderExt;
 use crate::{CLIResult, CommonArgs, ParallelizationArgs};
@@ -163,7 +162,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
 
         if Path::new(&output_path).is_file() {
             Some(
-                io::Input::new(&Some(output_path))
+                Input::new(&Some(output_path))
                     .csv_splitter()?
                     .count_records()?,
             )
@@ -174,7 +173,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         None
     };
 
-    let mut reader = io::Input::new(&args.input)
+    let mut reader = Input::new(&args.input)
         .delimiter(args.common.delimiter)
         .no_headers(args.common.no_headers)
         .csv_reader()?;
@@ -183,12 +182,8 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         reader.skip(skip)?;
     }
 
-    // TODO: --resume must open output with append, and write headers only if file already exists
-    // TODO: this require Output to have a method to set append mode & to return whether it already exist
-    // TODO: this means it should be opened before to avoid repeating the condition in line 147
-
     let text_column_index = reader.select_one(args.text_column.as_ref().unwrap())?;
-    let output = io::Output::new(&args.output);
+    let output = Output::maybe_resume(&args.output, args.resume)?;
     let model = args.model.unwrap_or_default();
     let mut writer = output.vector_writer(model.dim)?;
 
@@ -210,7 +205,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         .with_intra_threads(threads)?
         .commit_from_file(model_files.onnx)?;
 
-    if reader.has_headers() {
+    if !output.can_resume && reader.has_headers() {
         writer.write_headers(reader.byte_headers()?, model.dim, "dim_")?;
     }
 
@@ -254,7 +249,10 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         for (i, mut record) in zip(&sort_indices, records) {
             writer.write_vector(&mut record, &embeddings[*i])?;
         }
+
+        writer.flush()?;
     }
+
     writer.finish()?;
 
     Ok(())

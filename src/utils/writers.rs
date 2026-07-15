@@ -50,6 +50,15 @@ impl<T: npyz::Serialize + Display, WCsv: Write, WNpy: Write> VectorWriter<T, WCs
         }
     }
 
+    #[inline]
+    pub fn flush(&mut self) -> io::Result<()> {
+        if let Self::Csv(writer) = self {
+            writer.flush()?;
+        }
+
+        Ok(())
+    }
+
     pub fn finish(self) -> io::Result<()> {
         match self {
             Self::Csv(mut writer) => writer.flush(),

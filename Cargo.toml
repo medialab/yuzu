@@ -58,7 +58,7 @@ hf-hub = "0.4.3"
 ndarray = "0.17.2"
 npyz = "0.9.1"
 num_cpus = "1.17.0"
-ort = "2.0.0-rc.12"
+ort = { version = "=2.0.0-rc.12", default-features = false, features = ["api-17", "api-18", "api-19", "api-20", "api-21", "api-22", "copy-dylibs", "download-binaries", "ndarray", "std", "tls-native", "tracing"] }
 pariter = "0.6.0"
 rayon = "1.12.0"
 serde = { version = "1", features = ["rc"] }

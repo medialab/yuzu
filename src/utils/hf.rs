@@ -26,21 +26,7 @@ pub struct EmbeddingModel {
 
 impl Default for EmbeddingModel {
     fn default() -> Self {
-        Self {
-            model_id: "ibm-granite/granite-embedding-107m-multilingual",
-            alias: Some("granite"),
-            dim: 384,
-            padding_direction: PaddingDirection::Right,
-            pooling: Pooling::Cls,
-            max_length: 512,
-            disk_size: "417M",
-            preferred_language: "multilingual",
-            onnx_file: "model.onnx",
-            config_file: "config.json",
-            tokenizer_file: "tokenizer.json",
-            onnx_data_file: None,
-            local: false,
-        }
+        "granite".parse().unwrap()
     }
 }
 
@@ -49,8 +35,22 @@ impl FromStr for EmbeddingModel {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "granite" | "ibm-granite/granite-embedding-107m-multilingual" => Ok(Default::default()),
-            "qwen" | "Qwen/Qwen3-Embedding-0.6B" => Ok(EmbeddingModel {
+            "granite" | "ibm-granite/granite-embedding-107m-multilingual" => Ok(Self {
+                model_id: "ibm-granite/granite-embedding-107m-multilingual",
+                alias: Some("granite"),
+                dim: 384,
+                padding_direction: PaddingDirection::Right,
+                pooling: Pooling::Cls,
+                max_length: 512,
+                disk_size: "417M",
+                preferred_language: "multilingual",
+                onnx_file: "model.onnx",
+                config_file: "config.json",
+                tokenizer_file: "tokenizer.json",
+                onnx_data_file: None,
+                local: false,
+            }),
+            "qwen" | "Qwen/Qwen3-Embedding-0.6B" => Ok(Self {
                 model_id: "medialab-sciencespo/Qwen3-Embedding-0.6B-ONNX",
                 alias: Some("qwen"),
                 dim: 1024,
@@ -63,7 +63,7 @@ impl FromStr for EmbeddingModel {
                 onnx_data_file: Some("onnx/model.onnx_data"),
                 ..Default::default()
             }),
-            "mini" | "sentence-transformers/all-MiniLM-L6-v2" => Ok(EmbeddingModel {
+            "mini" | "sentence-transformers/all-MiniLM-L6-v2" => Ok(Self {
                 model_id: "sentence-transformers/all-MiniLM-L6-v2",
                 alias: Some("mini"),
                 dim: 384,
@@ -74,7 +74,7 @@ impl FromStr for EmbeddingModel {
                 onnx_file: "onnx/model.onnx",
                 ..Default::default()
             }),
-            "camembert" | "Lajavaness/sentence-camembert-large" => Ok(EmbeddingModel {
+            "camembert" | "Lajavaness/sentence-camembert-large" => Ok(Self {
                 model_id: "Lajavaness/sentence-camembert-large",
                 alias: Some("camembert"),
                 dim: 1024,
@@ -86,7 +86,7 @@ impl FromStr for EmbeddingModel {
                 ..Default::default()
             }),
             // #[cfg(test)]
-            "test-model" => Ok(EmbeddingModel {
+            "test-model" => Ok(Self {
                 model_id: "local",
                 pooling: Pooling::Mean,
                 onnx_file: "onnx/model.onnx",

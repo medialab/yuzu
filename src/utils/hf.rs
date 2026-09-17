@@ -16,6 +16,7 @@ pub struct EmbeddingModel {
     pub pooling: Pooling,
     pub max_length: usize,
     pub disk_size: &'static str,
+    pub preferred_language: &'static str,
     onnx_file: &'static str,
     config_file: &'static str,
     tokenizer_file: &'static str,
@@ -33,6 +34,7 @@ impl Default for EmbeddingModel {
             pooling: Pooling::Cls,
             max_length: 512,
             disk_size: "417M",
+            preferred_language: "multilingual",
             onnx_file: "model.onnx",
             config_file: "config.json",
             tokenizer_file: "tokenizer.json",
@@ -56,6 +58,7 @@ impl FromStr for EmbeddingModel {
                 pooling: Pooling::LastToken,
                 max_length: 8192,
                 disk_size: "1.2G",
+                preferred_language: "multilingual",
                 onnx_file: "onnx/model.onnx",
                 onnx_data_file: Some("onnx/model.onnx_data"),
                 ..Default::default()
@@ -67,6 +70,7 @@ impl FromStr for EmbeddingModel {
                 pooling: Pooling::Mean,
                 max_length: 256,
                 disk_size: "174M",
+                preferred_language: "english",
                 onnx_file: "onnx/model.onnx",
                 ..Default::default()
             }),
@@ -77,6 +81,7 @@ impl FromStr for EmbeddingModel {
                 pooling: Pooling::Mean,
                 max_length: 256,
                 disk_size: "1.3G",
+                preferred_language: "french",
                 onnx_file: "onnx/model_O2.onnx",
                 ..Default::default()
             }),
@@ -124,6 +129,7 @@ pub fn print_models_list() {
         println!("size on disk: {}", model.disk_size.purple());
         println!("context window: {}", model.max_length.to_string().red());
         println!("pooling: {}", model.pooling.as_str().green());
+        println!("preferred language: {}", model.preferred_language.green());
         println!();
     }
 }

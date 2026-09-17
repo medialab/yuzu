@@ -129,7 +129,7 @@ pub fn print_models_list() {
         println!("size on disk: {}", model.disk_size.purple());
         println!("context window: {}", model.max_length.to_string().red());
         println!("pooling: {}", model.pooling.as_str().green());
-        println!("preferred language: {}", model.preferred_language.to_string().green());
+        println!("preferred language: {}", model.preferred_language.green());
         println!();
     }
 }

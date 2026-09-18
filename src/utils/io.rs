@@ -32,7 +32,7 @@ impl FromStr for DynamicUsize {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            r"-1" => Ok(DynamicUsize::Unlimited),
+            "-1" => Ok(DynamicUsize::Unlimited),
             v => match NonZeroUsize::from_str(v) {
                 Ok(i) => Ok(DynamicUsize::Limited(i)),
                 Err(_) => {
@@ -40,6 +40,15 @@ impl FromStr for DynamicUsize {
                     Err(msg)
                 }
             },
+        }
+    }
+}
+
+impl DynamicUsize {
+    pub fn as_usize(self) -> Option<usize> {
+        match self {
+            Self::Limited(v) => Some(v.get()),
+            Self::Unlimited => None,
         }
     }
 }
@@ -286,7 +295,6 @@ impl Output {
     fn open_file(&self, path: impl AsRef<Path>) -> io::Result<File> {
         if self.can_resume {
             OpenOptions::new()
-                
                 .create(true)
                 .truncate(false)
                 .append(true)

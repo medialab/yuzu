@@ -211,27 +211,33 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
         writer.write_headers(reader.byte_headers()?, model.dim, "dim_")?;
     }
 
+    let default_batch_len = args.batch_size.as_usize().unwrap_or(1024);
+
+    let mut input_batch: Vec<String> = Vec::with_capacity(default_batch_len);
+    let mut records: Vec<ByteRecord> = Vec::with_capacity(default_batch_len);
+    let mut embeddings: Vec<Vec<f32>> = Vec::with_capacity(default_batch_len);
+
     for batch in reader.into_byte_records().chunks_or_total(args.batch_size) {
-        let mut input_batch: Vec<String> = Vec::with_capacity(batch.len());
-        let mut records: Vec<ByteRecord> = Vec::with_capacity(batch.len());
+        input_batch.clear();
+        records.clear();
+        embeddings.clear();
+
         for row in batch.into_iter() {
             let record = row?;
-            let string = String::from_utf8(record[text_column_index].to_vec()).unwrap();
+            let string = String::from_utf8(record[text_column_index].to_vec())?;
             input_batch.push(string);
             records.push(record);
         }
 
-        let mut sort_indices = (0..input_batch.len()).collect::<Vec<_>>();
+        let mut sorted_indices = (0..input_batch.len()).collect::<Vec<_>>();
 
         if threads > 1 {
-            sort_indices.par_sort_unstable_by_key(|&i| input_batch[i].len());
+            sorted_indices.par_sort_unstable_by_key(|&i| input_batch[i].len());
         } else {
-            sort_indices.sort_unstable_by_key(|&i| input_batch[i].len());
+            sorted_indices.sort_unstable_by_key(|&i| input_batch[i].len());
         }
 
-        let mut embeddings: Vec<Vec<f32>> = Vec::with_capacity(input_batch.len());
-
-        for idx_chunk in sort_indices.chunks(args.chunk_size.get()) {
+        for idx_chunk in sorted_indices.chunks(args.chunk_size.get()) {
             let timer_opt = args.verbose.then(SystemTime::now);
 
             let input: Vec<&str> = idx_chunk.iter().map(|&i| input_batch[i].as_str()).collect();
@@ -248,8 +254,8 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
             }
         }
 
-        for (i, mut record) in zip(&sort_indices, records) {
-            writer.write_vector(&mut record, &embeddings[*i])?;
+        for (i, record) in zip(&sorted_indices, records.iter_mut()) {
+            writer.write_vector(record, &embeddings[*i])?;
         }
 
         writer.flush()?;

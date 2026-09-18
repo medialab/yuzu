@@ -11,10 +11,9 @@ use ort::{
 };
 use rayon::prelude::*;
 use simd_csv::{ByteRecord, Selector};
-use std::fs::File;
-use tokenizers::Tokenizer;
+use tokenizers::{EncodeInput, Tokenizer};
 
-use crate::utils::hf::{EmbeddingModel, print_models_list};
+use crate::utils::hf::{EmbeddingModel, ModelType, print_models_list};
 use crate::utils::io::{DynamicUsize, Input, Output};
 use crate::utils::iter::IteratorExt;
 use crate::utils::readers::ReaderExt;
@@ -30,14 +29,19 @@ fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
     }
 }
 
-fn encode(
-    input: Vec<&str>,
+fn encode<'s, E>(
+    input: Vec<E>,
     session: &mut Session,
     tokenizer: &Tokenizer,
     model: &EmbeddingModel,
-    model_type: Option<&str>,
-) -> Vec<Vec<f32>> {
+    model_type: ModelType,
+) -> Vec<Vec<f32>>
+where
+    E: Into<EncodeInput<'s>> + Send,
+{
     let input_len = input.len();
+
+    debug_assert!(input_len > 0);
 
     let encodings = tokenizer.encode_batch(input, true).unwrap();
     let padded_token_length = encodings
@@ -74,9 +78,9 @@ fn encode(
         TensorRef::from_array_view(([input_len, padded_token_length], &*type_ids)).unwrap();
 
     let session_input = match model_type {
-        Some("qwen3") => Vec::from(ort::inputs![a_ids, a_mask.clone(), a_position_ids]),
-        Some("bert") => Vec::from(ort::inputs![a_ids, a_mask.clone(), a_type_ids]),
-        _ => Vec::from(ort::inputs![a_ids, a_mask.clone()]),
+        ModelType::Qwen3 => Vec::from(ort::inputs![a_ids, a_mask.clone(), a_position_ids]),
+        ModelType::Bert => Vec::from(ort::inputs![a_ids, a_mask.clone(), a_type_ids]),
+        ModelType::Other => Vec::from(ort::inputs![a_ids, a_mask.clone()]),
     };
 
     let session_output: ort::session::SessionOutputs<'_> =
@@ -90,11 +94,10 @@ fn encode(
         .pooling
         .apply(&last_hidden_state, Some(&attention_mask));
 
-    let normalized: Vec<Vec<f32>> = pooled_embeddings
+    pooled_embeddings
         .axis_iter(Axis(0))
         .map(l2_normalize)
-        .collect();
-    normalized
+        .collect()
 }
 
 #[derive(Args, Debug)]
@@ -190,14 +193,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
     let mut writer = output.vector_writer(model.dim)?;
 
     let model_files = model.paths()?;
-
-    let config = File::open(model_files.config).expect("file should open read only");
-    let json: serde_json::Value =
-        serde_json::from_reader(config).expect("file should be proper JSON");
-    let model_type = json
-        .get("model_type")
-        .expect("file should have model_type key")
-        .as_str();
+    let model_type = model_files.model_type()?;
 
     let tokenizer = model.tokenizer(&model_files.tokenizer)?;
 

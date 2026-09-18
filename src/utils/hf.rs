@@ -1,4 +1,6 @@
 use hf_hub::api::sync::{Api, ApiError, ApiRepo};
+use std::convert::Infallible;
+use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use tokenizers::{
@@ -6,6 +8,25 @@ use tokenizers::{
 };
 
 use crate::utils::pooling::Pooling;
+
+#[derive(Debug, Clone, Copy)]
+pub enum ModelType {
+    Qwen3,
+    Bert,
+    Other,
+}
+
+impl FromStr for ModelType {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "qwen3" => Self::Qwen3,
+            "bert" => Self::Bert,
+            _ => Self::Other,
+        })
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct EmbeddingModel {
@@ -138,6 +159,21 @@ pub struct ModelPaths {
     pub onnx: PathBuf,
     pub config: PathBuf,
     pub tokenizer: PathBuf,
+}
+
+impl ModelPaths {
+    pub fn model_type(&self) -> Result<ModelType, &'static str> {
+        let config = File::open(&self.config).map_err(|_| "could not open model config file")?;
+        let json: serde_json::Value =
+            serde_json::from_reader(config).map_err(|_| "model config is not valid JSON")?;
+        let model_type_str = json
+            .get("model_type")
+            .ok_or("config file should have a model_type")?
+            .as_str()
+            .unwrap();
+
+        Ok(model_type_str.parse().unwrap())
+    }
 }
 
 impl EmbeddingModel {

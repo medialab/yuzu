@@ -5,7 +5,7 @@ use std::time::SystemTime;
 use clap::Args;
 use ndarray::{ArrayView1, Axis};
 use ort::{
-    execution_providers::CPUExecutionProvider,
+    ep,
     session::{Session, builder::GraphOptimizationLevel},
     value::TensorRef,
 };
@@ -201,7 +201,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
 
     let mut session = Session::builder()?
         .with_optimization_level(GraphOptimizationLevel::Level3)?
-        .with_execution_providers([CPUExecutionProvider::default().build()])?
+        .with_execution_providers([ep::CPU::default().build()])?
         .with_intra_threads(threads)?
         .commit_from_file(model_files.onnx)?;
 

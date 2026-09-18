@@ -12,7 +12,6 @@ use ort::{
 use rayon::prelude::*;
 use simd_csv::{ByteRecord, Selector};
 use std::fs::File;
-use std::iter::zip;
 use tokenizers::Tokenizer;
 
 use crate::utils::hf::{EmbeddingModel, print_models_list};
@@ -227,6 +226,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
             let string = String::from_utf8(record[text_column_index].to_vec())?;
             input_batch.push(string);
             records.push(record);
+            embeddings.push(Vec::new());
         }
 
         let mut sorted_indices = (0..input_batch.len()).collect::<Vec<_>>();
@@ -241,9 +241,11 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
             let timer_opt = args.verbose.then(SystemTime::now);
 
             let input: Vec<&str> = idx_chunk.iter().map(|&i| input_batch[i].as_str()).collect();
-            let embedding = encode(input, &mut session, &tokenizer, &model, model_type);
+            let mut embedding = encode(input, &mut session, &tokenizer, &model, model_type);
 
-            embeddings.extend(embedding);
+            for (&i, e) in idx_chunk.iter().zip(embedding.iter_mut()) {
+                std::mem::swap(&mut embeddings[i], e);
+            }
 
             if let Some(timer) = timer_opt {
                 eprintln!(
@@ -254,8 +256,8 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
             }
         }
 
-        for (i, record) in zip(&sorted_indices, records.iter_mut()) {
-            writer.write_vector(record, &embeddings[*i])?;
+        for (record, embedding) in records.iter_mut().zip(&embeddings) {
+            writer.write_vector(record, embedding)?;
         }
 
         writer.flush()?;

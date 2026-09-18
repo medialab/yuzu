@@ -66,3 +66,77 @@ fn embed_total() {
             1,
         );
 }
+
+#[test]
+fn embed_argsort_consistency() {
+    let expected = vec![
+        vec![
+            0.03272301,
+            0.05405777,
+            0.039685573,
+            -0.020051328,
+            -0.14868496,
+        ],
+        vec![
+            -0.049536016,
+            0.0014692778,
+            0.0014806606,
+            -0.047504283,
+            -0.050163805,
+        ],
+        vec![
+            -0.044822857,
+            0.008428363,
+            0.0014387168,
+            -0.06648014,
+            -0.0467383,
+        ],
+        vec![
+            -0.06250424,
+            -0.0065791286,
+            0.0613406,
+            -0.03893918,
+            0.031070044,
+        ],
+    ];
+
+    cmd()
+        .arg("embed")
+        .arg("text")
+        .args([
+            "--model",
+            "test-model",
+            "--batch-size",
+            "4",
+            "--chunk-size",
+            "4",
+        ])
+        .write_csv_stdin(&[
+            &["text"],
+            &["cacatoes ok?"],
+            &["le chat mange la souris"],
+            &["le chat mange"],
+            &["le chat"],
+        ])
+        .approx_assert_csv_matrix(expected.clone(), 1);
+
+    cmd()
+        .arg("embed")
+        .arg("text")
+        .args([
+            "--model",
+            "test-model",
+            "--batch-size",
+            "1",
+            "--chunk-size",
+            "1",
+        ])
+        .write_csv_stdin(&[
+            &["text"],
+            &["cacatoes ok?"],
+            &["le chat mange la souris"],
+            &["le chat mange"],
+            &["le chat"],
+        ])
+        .approx_assert_csv_matrix(expected.clone(), 1);
+}

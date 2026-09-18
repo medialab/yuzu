@@ -135,14 +135,14 @@ fn main() {
     if let Err(error) = result {
         match error {
             CLIError::Custom(msg) => {
-                eprintln!("{}", msg);
+                eprintln!("{msg}");
                 process::exit(1);
             }
             CLIError::Io(err) if err.kind() == io::ErrorKind::BrokenPipe => {
                 process::exit(0);
             }
             CLIError::Io(err) => {
-                eprintln!("{}", err);
+                eprintln!("{err}");
                 process::exit(1);
             }
         }

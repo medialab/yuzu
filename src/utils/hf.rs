@@ -95,7 +95,7 @@ impl FromStr for EmbeddingModel {
                 ..Default::default()
             },
             _ => {
-                let msg = format!("Model {} not supported", value);
+                let msg = format!("Model {value} not supported");
                 return Err(msg);
             }
         })
@@ -119,7 +119,7 @@ pub fn print_models_list() {
             "{}{}",
             model.model_id.cyan(),
             if let Some(name) = model.alias {
-                format!(" ({})", name)
+                format!(" ({name})")
             } else {
                 "".to_string()
             }

@@ -59,9 +59,8 @@ impl FromStr for Delimiter {
             s => {
                 if s.len() != 1 {
                     let msg = format!(
-                        "Could not convert '{}' to a single \
-                                       ASCII character.",
-                        s
+                        "Could not convert '{s}' to a single \
+                                       ASCII character."
                     );
                     return Err(msg);
                 }
@@ -70,9 +69,8 @@ impl FromStr for Delimiter {
                     Ok(Delimiter(c as u8))
                 } else {
                     let msg = format!(
-                        "Could not convert '{}' \
-                                       to ASCII delimiter.",
-                        c
+                        "Could not convert '{c}' \
+                                       to ASCII delimiter."
                     );
                     Err(msg)
                 }
@@ -288,7 +286,7 @@ impl Output {
     fn open_file(&self, path: impl AsRef<Path>) -> io::Result<File> {
         if self.can_resume {
             OpenOptions::new()
-                .write(true)
+                
                 .create(true)
                 .truncate(false)
                 .append(true)

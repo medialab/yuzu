@@ -106,8 +106,7 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
     args.parallelization.build_rayon_global_thread_pool();
 
     let model = args.model.unwrap_or_default();
-    let tokenizer_path = model.tokenizer_path()?;
-    let tokenizer = model.tokenizer(&tokenizer_path)?;
+    let tokenizer = model.tokenizer()?;
 
     let mut reader = io::Input::new(&args.input)
         .delimiter(args.common.delimiter)

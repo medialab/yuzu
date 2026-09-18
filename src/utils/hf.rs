@@ -1,12 +1,21 @@
-use hf_hub::api::sync::{Api, ApiError, ApiRepo};
 use std::convert::Infallible;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+
+use hf_hub::api::sync::{Api, ApiError, ApiRepo};
+use ndarray::{ArrayView1, Axis};
+use ort::{
+    ep,
+    session::{Session, builder::GraphOptimizationLevel},
+    value::TensorRef,
+};
 use tokenizers::{
-    Error as TokenizerError, PaddingDirection, PaddingParams, Tokenizer, TruncationParams,
+    EncodeInput, Error as TokenizerError, PaddingDirection, PaddingParams, Tokenizer,
+    TruncationParams,
 };
 
+use crate::CLIResult;
 use crate::utils::pooling::Pooling;
 
 #[derive(Debug, Clone, Copy)]
@@ -223,7 +232,7 @@ impl EmbeddingModel {
         }
     }
 
-    pub fn tokenizer(&self, path: impl AsRef<Path>) -> Result<Tokenizer, TokenizerError> {
+    pub fn tokenizer_from_path(&self, path: impl AsRef<Path>) -> Result<Tokenizer, TokenizerError> {
         let padding = PaddingParams {
             direction: self.padding_direction,
             ..Default::default()
@@ -239,5 +248,114 @@ impl EmbeddingModel {
         tokenizer.with_truncation(Some(truncation))?;
 
         Ok(tokenizer)
+    }
+
+    #[inline]
+    pub fn tokenizer(&self) -> Result<Tokenizer, TokenizerError> {
+        self.tokenizer_from_path(self.tokenizer_path()?)
+    }
+
+    pub fn embedder(&self, threads: usize) -> CLIResult<Embedder> {
+        let paths = self.paths()?;
+
+        let session = Session::builder()?
+            .with_optimization_level(GraphOptimizationLevel::Level3)?
+            .with_execution_providers([ep::CPU::default().build()])?
+            .with_intra_threads(threads)?
+            .commit_from_file(&paths.onnx)?;
+
+        let tokenizer = self.tokenizer_from_path(&paths.tokenizer)?;
+
+        let model_type = paths.model_type()?;
+
+        Ok(Embedder {
+            tokenizer,
+            session,
+            model_type,
+            pooling: self.pooling,
+        })
+    }
+}
+
+fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
+    let norm = vec.dot(&vec).sqrt();
+
+    if norm > 0.0 {
+        vec.iter().map(|x| x / norm).collect()
+    } else {
+        vec.to_vec()
+    }
+}
+
+pub struct Embedder {
+    tokenizer: Tokenizer,
+    session: Session,
+    model_type: ModelType,
+    pooling: Pooling,
+}
+
+impl Embedder {
+    pub fn embed<'s, E>(&mut self, input: Vec<E>) -> CLIResult<Vec<Vec<f32>>>
+    where
+        E: Into<EncodeInput<'s>> + Send,
+    {
+        let input_len = input.len();
+
+        debug_assert!(input_len > 0);
+
+        let encodings = self.tokenizer.encode_batch(input, true)?;
+        let padded_token_len = encodings
+            .iter()
+            .map(|encoding| encoding.len())
+            .max()
+            .unwrap();
+
+        let ids: Vec<i64> = encodings
+            .iter()
+            .flat_map(|e| e.get_ids().iter().map(|i| *i as i64))
+            .collect();
+
+        let mask: Vec<i64> = encodings
+            .iter()
+            .flat_map(|e| e.get_attention_mask().iter().map(|i| *i as i64))
+            .collect();
+
+        let position_ids: Vec<i64> = encodings
+            .iter()
+            .flat_map(|_| (0..padded_token_len as i64))
+            .collect();
+
+        let type_ids: Vec<i64> = encodings
+            .iter()
+            .flat_map(|e| e.get_type_ids().iter().map(|i| *i as i64))
+            .collect();
+
+        let a_ids = TensorRef::from_array_view(([input_len, padded_token_len], &*ids))?;
+        let a_mask = TensorRef::from_array_view(([input_len, padded_token_len], &*mask))?;
+        let a_position_ids =
+            TensorRef::from_array_view(([input_len, padded_token_len], &*position_ids))?;
+        let a_type_ids = TensorRef::from_array_view(([input_len, padded_token_len], &*type_ids))?;
+
+        let session_input = match self.model_type {
+            ModelType::Qwen3 => Vec::from(ort::inputs![a_ids, a_mask.clone(), a_position_ids]),
+            ModelType::Bert => Vec::from(ort::inputs![a_ids, a_mask.clone(), a_type_ids]),
+            ModelType::Other => Vec::from(ort::inputs![a_ids, a_mask.clone()]),
+        };
+
+        let session_output: ort::session::SessionOutputs<'_> =
+            self.session.run(session_input.as_slice())?;
+
+        let last_hidden_state = session_output[0].try_extract_array::<f32>()?;
+
+        // TODO: What if attention_mask is not needed? in pooling.apply?
+        let attention_mask = a_mask.try_extract_array::<i64>()?;
+        let pooled_embeddings = self
+            .pooling
+            .apply(&last_hidden_state, Some(&attention_mask));
+
+        Ok(pooled_embeddings
+            .axis_iter(Axis(0))
+            .map(l2_normalize)
+            .collect())
     }
 }

@@ -3,102 +3,15 @@ use std::path::Path;
 use std::time::SystemTime;
 
 use clap::Args;
-use ndarray::{ArrayView1, Axis};
-use ort::{
-    ep,
-    session::{Session, builder::GraphOptimizationLevel},
-    value::TensorRef,
-};
+
 use rayon::prelude::*;
 use simd_csv::{ByteRecord, Selector};
-use tokenizers::{EncodeInput, Tokenizer};
 
-use crate::utils::hf::{EmbeddingModel, ModelType, print_models_list};
+use crate::utils::hf::{EmbeddingModel, print_models_list};
 use crate::utils::io::{DynamicUsize, Input, Output};
 use crate::utils::iter::IteratorExt;
 use crate::utils::readers::ReaderExt;
 use crate::{CLIResult, CommonArgs, ParallelizationArgs};
-
-fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
-    let norm = vec.dot(&vec).sqrt();
-
-    if norm > 0.0 {
-        vec.iter().map(|x| x / norm).collect()
-    } else {
-        vec.to_vec()
-    }
-}
-
-fn encode<'s, E>(
-    input: Vec<E>,
-    session: &mut Session,
-    tokenizer: &Tokenizer,
-    model: &EmbeddingModel,
-    model_type: ModelType,
-) -> Vec<Vec<f32>>
-where
-    E: Into<EncodeInput<'s>> + Send,
-{
-    let input_len = input.len();
-
-    debug_assert!(input_len > 0);
-
-    let encodings = tokenizer.encode_batch(input, true).unwrap();
-    let padded_token_length = encodings
-        .iter()
-        .map(|encoding| encoding.len())
-        .max()
-        .unwrap();
-
-    let ids: Vec<i64> = encodings
-        .iter()
-        .flat_map(|e| e.get_ids().iter().map(|i| *i as i64))
-        .collect();
-
-    let mask: Vec<i64> = encodings
-        .iter()
-        .flat_map(|e| e.get_attention_mask().iter().map(|i| *i as i64))
-        .collect();
-
-    let position_ids: Vec<i64> = encodings
-        .iter()
-        .flat_map(|_| (0..padded_token_length as i64))
-        .collect();
-
-    let type_ids: Vec<i64> = encodings
-        .iter()
-        .flat_map(|e| e.get_type_ids().iter().map(|i| *i as i64))
-        .collect();
-
-    let a_ids = TensorRef::from_array_view(([input_len, padded_token_length], &*ids)).unwrap();
-    let a_mask = TensorRef::from_array_view(([input_len, padded_token_length], &*mask)).unwrap();
-    let a_position_ids =
-        TensorRef::from_array_view(([input_len, padded_token_length], &*position_ids)).unwrap();
-    let a_type_ids =
-        TensorRef::from_array_view(([input_len, padded_token_length], &*type_ids)).unwrap();
-
-    let session_input = match model_type {
-        ModelType::Qwen3 => Vec::from(ort::inputs![a_ids, a_mask.clone(), a_position_ids]),
-        ModelType::Bert => Vec::from(ort::inputs![a_ids, a_mask.clone(), a_type_ids]),
-        ModelType::Other => Vec::from(ort::inputs![a_ids, a_mask.clone()]),
-    };
-
-    let session_output: ort::session::SessionOutputs<'_> =
-        session.run(session_input.as_slice()).unwrap();
-
-    let last_hidden_state = session_output[0].try_extract_array::<f32>().unwrap();
-
-    // TODO: What if attention_mask is not needed? in pooling.apply?
-    let attention_mask = a_mask.try_extract_array::<i64>().unwrap();
-    let pooled_embeddings = model
-        .pooling
-        .apply(&last_hidden_state, Some(&attention_mask));
-
-    pooled_embeddings
-        .axis_iter(Axis(0))
-        .map(l2_normalize)
-        .collect()
-}
 
 #[derive(Args, Debug)]
 pub struct EmbedArgs {
@@ -192,16 +105,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
     let model = args.model.unwrap_or_default();
     let mut writer = output.vector_writer(model.dim)?;
 
-    let model_files = model.paths()?;
-    let model_type = model_files.model_type()?;
-
-    let tokenizer = model.tokenizer(&model_files.tokenizer)?;
-
-    let mut session = Session::builder()?
-        .with_optimization_level(GraphOptimizationLevel::Level3)?
-        .with_execution_providers([ep::CPU::default().build()])?
-        .with_intra_threads(threads)?
-        .commit_from_file(model_files.onnx)?;
+    let mut embedder = model.embedder(threads)?;
 
     if !output.can_resume && reader.has_headers() {
         writer.write_headers(reader.byte_headers()?, model.dim, "dim_")?;
@@ -238,7 +142,7 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
             let timer_opt = args.verbose.then(SystemTime::now);
 
             let input: Vec<&str> = idx_chunk.iter().map(|&i| input_batch[i].as_str()).collect();
-            let mut embedding = encode(input, &mut session, &tokenizer, &model, model_type);
+            let mut embedding = embedder.embed(input)?;
 
             for (&i, e) in idx_chunk.iter().zip(embedding.iter_mut()) {
                 std::mem::swap(&mut embeddings[i], e);

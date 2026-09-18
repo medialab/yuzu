@@ -21,7 +21,8 @@ use crate::utils::readers::ReaderExt;
 use crate::{CLIResult, CommonArgs, ParallelizationArgs};
 
 fn l2_normalize(vec: ArrayView1<f32>) -> Vec<f32> {
-    let norm = vec.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let norm = vec.dot(&vec).sqrt();
+
     if norm > 0.0 {
         vec.iter().map(|x| x / norm).collect()
     } else {

@@ -65,7 +65,7 @@ serde = { version = "1", features = ["rc"] }
 serde_derive = "1"
 serde_json = "1.0"
 simd-csv = { version = "0.14.0", features = ["str"] }
-tokenizers = "0.22.1"
+tokenizers = "0.23.2"
 whichlang = { git = "https://github.com/medialab/whichlang", rev = "92591fa2" }
 zstd = "0.14.0"
 

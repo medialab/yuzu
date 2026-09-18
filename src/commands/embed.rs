@@ -37,7 +37,9 @@ fn encode(
     model: &EmbeddingModel,
     model_type: Option<&str>,
 ) -> Vec<Vec<f32>> {
-    let encodings = tokenizer.encode_batch(input.clone(), true).unwrap();
+    let input_len = input.len();
+
+    let encodings = tokenizer.encode_batch(input, true).unwrap();
     let padded_token_length = encodings
         .iter()
         .map(|encoding| encoding.len())
@@ -64,12 +66,12 @@ fn encode(
         .flat_map(|e| e.get_type_ids().iter().map(|i| *i as i64))
         .collect();
 
-    let a_ids = TensorRef::from_array_view(([input.len(), padded_token_length], &*ids)).unwrap();
-    let a_mask = TensorRef::from_array_view(([input.len(), padded_token_length], &*mask)).unwrap();
+    let a_ids = TensorRef::from_array_view(([input_len, padded_token_length], &*ids)).unwrap();
+    let a_mask = TensorRef::from_array_view(([input_len, padded_token_length], &*mask)).unwrap();
     let a_position_ids =
-        TensorRef::from_array_view(([input.len(), padded_token_length], &*position_ids)).unwrap();
+        TensorRef::from_array_view(([input_len, padded_token_length], &*position_ids)).unwrap();
     let a_type_ids =
-        TensorRef::from_array_view(([input.len(), padded_token_length], &*type_ids)).unwrap();
+        TensorRef::from_array_view(([input_len, padded_token_length], &*type_ids)).unwrap();
 
     let session_input = match model_type {
         Some("qwen3") => Vec::from(ort::inputs![a_ids, a_mask.clone(), a_position_ids]),

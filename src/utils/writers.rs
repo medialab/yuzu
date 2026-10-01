@@ -20,7 +20,7 @@ impl<T: npyz::Serialize + Display, WCsv: Write, WNpy: Write> VectorWriter<T, WCs
             let mut headers = headers.clone();
 
             for i in 0..dimensions {
-                headers.push_field(format!("{}{}", prefix, i).as_bytes());
+                headers.push_field(format!("{prefix}{i}").as_bytes());
             }
 
             writer.write_byte_record(&headers)?;

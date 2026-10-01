@@ -3,6 +3,7 @@ use std::io;
 use std::num::NonZeroUsize;
 use std::process;
 use std::str::Utf8Error;
+use std::string::FromUtf8Error;
 
 use clap::{Args, Parser, Subcommand};
 
@@ -52,6 +53,7 @@ macro_rules! impl_from_error {
 
 impl_from_error!(&str);
 impl_from_error!(Utf8Error);
+impl_from_error!(FromUtf8Error);
 impl_from_error!(hf_hub::api::sync::ApiError);
 impl_from_error!(tokenizers::Error);
 impl_from_error!(ort::Error);
@@ -135,14 +137,14 @@ fn main() {
     if let Err(error) = result {
         match error {
             CLIError::Custom(msg) => {
-                eprintln!("{}", msg);
+                eprintln!("{msg}");
                 process::exit(1);
             }
             CLIError::Io(err) if err.kind() == io::ErrorKind::BrokenPipe => {
                 process::exit(0);
             }
             CLIError::Io(err) => {
-                eprintln!("{}", err);
+                eprintln!("{err}");
                 process::exit(1);
             }
         }

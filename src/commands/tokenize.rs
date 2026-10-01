@@ -62,7 +62,7 @@ pub struct TokenizeArgs {
     #[arg(long)]
     count: bool,
 
-    /// If given, will display a boolean indicating wether the number of tokens fits in the chosen
+    /// If given, will display a boolean indicating whether the number of tokens fits in the chosen
     /// model's context window. Cannot be used with --explode nor --count.
     #[arg(long)]
     fits: bool,
@@ -182,7 +182,10 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
                 if args.count {
                     record.fmt_field(&tokens.len());
                 } else if args.fits {
-                    record.fmt_field(&((tokens.len() < model.max_length) as u8));
+                    record.fmt_field(&match tokens.len() < model.max_length {
+                        true => "1",
+                        false => "",
+                    });
                 } else {
                     record.push_field(tokens.join(&args.sep).as_bytes());
                 }

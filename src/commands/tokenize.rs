@@ -182,9 +182,10 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
                 if args.count {
                     record.fmt_field(&tokens.len());
                 } else if args.fits {
-                    record.fmt_field(&match tokens.len() < model.max_length {
-                        true => "1",
-                        false => "",
+                    record.push_field(if tokens.len() < model.max_length {
+                        "true".as_bytes()
+                    } else {
+                        "false".as_bytes()
                     });
                 } else {
                     record.push_field(tokens.join(&args.sep).as_bytes());

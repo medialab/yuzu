@@ -58,9 +58,14 @@ pub struct TokenizeArgs {
     #[arg(long, default_value = "32")]
     chunk_size: NonZeroUsize,
 
-    /// If given, will count the number of tokens instead. Cannot be used with --explode.
+    /// If given, will count the number of tokens instead. Cannot be used with --explode nor --fits.
     #[arg(long)]
     count: bool,
+
+    /// If given, will display a boolean indicating whether the number of tokens fits in the chosen
+    /// model's context window. Cannot be used with --explode nor --count.
+    #[arg(long)]
+    fits: bool,
 
     /// Name of the column to append. Defaults to "tokens", or "token" when used with --explode
     /// or "token_count" when used with --count.
@@ -77,7 +82,7 @@ pub struct TokenizeArgs {
     keep: bool,
 
     /// If given, "explode" the output by priting a copy of the record per token. This can be
-    /// useful to compute aggregation at the token level. Cannot be used with --count.
+    /// useful to compute aggregation at the token level. Cannot be used with --count nor --fits.
     #[arg(long)]
     explode: bool,
 
@@ -133,6 +138,8 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
             None => {
                 if args.count {
                     &b"token_count"[..]
+                } else if args.fits {
+                    &b"fits"[..]
                 } else if args.explode {
                     &b"token"[..]
                 } else {
@@ -174,6 +181,12 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
             } else {
                 if args.count {
                     record.fmt_field(&tokens.len());
+                } else if args.fits {
+                    record.push_field(if tokens.len() < model.max_length {
+                        "true".as_bytes()
+                    } else {
+                        "false".as_bytes()
+                    });
                 } else {
                     record.push_field(tokens.join(&args.sep).as_bytes());
                 }

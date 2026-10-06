@@ -11,6 +11,7 @@ homepage = "https://github.com/medialab/yuzu"
 authors = [
   "Béatrice Mazoyer <beatrice.mazoyer@sciencespo.fr>",
   "Guillaume Plique <guillaume.plique@sciencespo.fr>",
+  "Clothilde Marko-Lafon <c.marko.lafon@gmail.com>",
 ]
 include = [
   "Cargo.toml",

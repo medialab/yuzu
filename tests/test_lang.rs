@@ -100,3 +100,51 @@ fn lang_parallel() {
             &["cette phrase est en français", "fra"],
         ]);
 }
+
+#[test]
+fn lang_filter_ease() {
+    cmd()
+        .arg("lang")
+        .arg("sentence")
+        .arg("--filter-ease")
+        .write_csv_stdin(&[
+            &["sentence"],
+            &["this is an English sentence!!! 123 https://example.com 😊 zzzzzzzzz"],
+            &["cette phrase est en français!!! 123 https://example.com 😊 zzzzzzzzz"],
+        ])
+        .assert_csv(&[
+            &["sentence", "lang"],
+            &[
+                "this is an English sentence!!! 123 https://example.com 😊 zzzzzzzzz",
+                "eng",
+            ],
+            &[
+                "cette phrase est en français!!! 123 https://example.com 😊 zzzzzzzzz",
+                "fra",
+            ],
+        ]);
+}
+
+#[test]
+fn lang_filter_ease_parallel() {
+    cmd()
+        .arg("lang")
+        .arg("sentence")
+        .args(["--filter-ease", "-p"])
+        .write_csv_stdin(&[
+            &["sentence"],
+            &["this is an English sentence!!! 123 https://example.com 😊 zzzzzzzzz"],
+            &["cette phrase est en français!!! 123 https://example.com 😊 zzzzzzzzz"],
+        ])
+        .assert_csv(&[
+            &["sentence", "lang"],
+            &[
+                "this is an English sentence!!! 123 https://example.com 😊 zzzzzzzzz",
+                "eng",
+            ],
+            &[
+                "cette phrase est en français!!! 123 https://example.com 😊 zzzzzzzzz",
+                "fra",
+            ],
+        ]);
+}

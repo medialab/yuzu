@@ -1,10 +1,10 @@
 use std::str::from_utf8;
 
 use clap::Args;
+use paltoquet::tokenizers::{WordTokenKind, WordTokenizer};
 use pariter::IteratorExt;
 use simd_csv::{ByteRecord, Selector};
 use whichlang::detect_language;
-use paltoquet::tokenizers::{WordTokenizer, WordTokenKind};
 
 use crate::utils::io::{Input, Output};
 use crate::utils::iter::IteratorExt as _;
@@ -46,18 +46,19 @@ pub struct LangArgs {
 }
 
 impl LangArgs {
-    fn process_record(&self, record: &mut ByteRecord, column_index: usize, word_tokenizer: Option<&WordTokenizer>) -> CLIResult<()> {
-        // let text = if let Some(tokenizer) = word_tokenizer {
-        //     &(tokenizer
-        //         .tokenize(from_utf8(&record[column_index])?)
-        //         .map(|token| { if !token.is_junk() {token.text} else {""}})
-        //         .collect::<Vec<_>>().join(" "))
+    fn process_record(
+        &self,
+        record: &mut ByteRecord,
+        column_index: usize,
+        word_tokenizer: Option<&WordTokenizer>,
+    ) -> CLIResult<()> {
         let text = if let Some(tokenizer) = word_tokenizer {
             &(tokenizer
                 .tokenize(from_utf8(&record[column_index])?)
-                .filter_map(|token| { 
+                .filter_map(|token| {
                     let (tok, tok_kind) = token.to_pair();
-                    (!token.is_junk() && tok_kind == WordTokenKind::Word).then_some(tok)})
+                    (!token.is_junk() && tok_kind == WordTokenKind::Word).then_some(tok)
+                })
                 .collect::<Vec<_>>()
                 .join(" "))
         } else {
@@ -65,7 +66,7 @@ impl LangArgs {
         };
 
         let lang_opt = detect_language(text.as_ref());
-        
+
         let cell = if let Some(lang) = lang_opt {
             if self.full_name {
                 lang.eng_name()

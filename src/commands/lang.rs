@@ -64,12 +64,10 @@ impl LangArgs {
         } else {
             from_utf8(&record[column_index])?
         };
-        
-        let lang_opt = if text != "" {
-            detect_language(text.as_ref())
-        } else {
-            None
-        };
+
+        let lang_opt = (!text.is_empty())
+            .then_some(text)
+            .and_then(|t| detect_language(t.as_ref()));
 
         let cell = if let Some(lang) = lang_opt {
             if self.full_name {

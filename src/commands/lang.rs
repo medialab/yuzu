@@ -34,7 +34,7 @@ pub struct LangArgs {
     #[arg(short, long)]
     output: Option<String>,
 
-    /// Path to output file. Will write to stdout if not given or if path is "-".
+    /// Wether to filter the tokens that cannot have their lang detected in given text.
     #[arg(long)]
     filter_ease: bool,
 

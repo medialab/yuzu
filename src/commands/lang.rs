@@ -1,4 +1,3 @@
-use std::println;
 use std::str::from_utf8;
 
 use clap::Args;
@@ -64,14 +63,9 @@ impl LangArgs {
         } else {
             from_utf8(&record[column_index])?
         };
-        let txt = from_utf8(&record[column_index])?;
+
         let lang_opt = detect_language(text.as_ref());
-        let txt_lang = if let Some(lang) = lang_opt {
-            lang.three_letter_code()
-        } else {
-            ""
-        };
-        println!("{:>60} | {:<60} | {:<3} | {}", txt.chars().take(60).collect::<String>(), text.chars().take(60).collect::<String>(), text.len(), txt_lang);
+        
         let cell = if let Some(lang) = lang_opt {
             if self.full_name {
                 lang.eng_name()
@@ -104,14 +98,8 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
         writer.write_byte_record(&headers)?;
     }
 
-    let tokenizer = if args.filter_ease {
-        Some(WordTokenizer::new())
-    } else {
-        None
-    };
-    println!("{:>60} | {:<60} | len | {}", "original", "tokenize [w/o junk]", "whichlang");
+    let tokenizer = args.filter_ease.then(WordTokenizer::new);
 
-    println!("--------------------------------------------------------------------------------------------------------------------------------------------");
     if let Some(t) = args.parallelization.threads() {
         for result in reader.into_byte_records().chunks(64).parallel_map_custom(
             |o| o.threads(t),
@@ -138,7 +126,6 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
             writer.write_byte_record(&record)?;
         }
     }
-    println!("--------------------------------------------------------------------------------------------------------------------------------------------");
 
     Ok(writer.flush()?)
 }

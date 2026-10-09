@@ -1,9 +1,11 @@
+use std::println;
 use std::str::from_utf8;
 
 use clap::Args;
 use pariter::IteratorExt;
 use simd_csv::{ByteRecord, Selector};
 use whichlang::detect_language;
+use paltoquet::tokenizers::{WordTokenizer, WordTokenKind};
 
 use crate::utils::io::{Input, Output};
 use crate::utils::iter::IteratorExt as _;
@@ -33,6 +35,10 @@ pub struct LangArgs {
     #[arg(short, long)]
     output: Option<String>,
 
+    /// Path to output file. Will write to stdout if not given or if path is "-".
+    #[arg(long)]
+    filter_ease: bool,
+
     #[command(flatten)]
     parallelization: ParallelizationArgs,
 
@@ -41,10 +47,31 @@ pub struct LangArgs {
 }
 
 impl LangArgs {
-    fn process_record(&self, record: &mut ByteRecord, column_index: usize) -> CLIResult<()> {
-        let text = &record[column_index];
-        let lang_opt = detect_language(from_utf8(text)?);
-
+    fn process_record(&self, record: &mut ByteRecord, column_index: usize, word_tokenizer: Option<&WordTokenizer>) -> CLIResult<()> {
+        // let text = if let Some(tokenizer) = word_tokenizer {
+        //     &(tokenizer
+        //         .tokenize(from_utf8(&record[column_index])?)
+        //         .map(|token| { if !token.is_junk() {token.text} else {""}})
+        //         .collect::<Vec<_>>().join(" "))
+        let text = if let Some(tokenizer) = word_tokenizer {
+            &(tokenizer
+                .tokenize(from_utf8(&record[column_index])?)
+                .filter_map(|token| { 
+                    let (tok, tok_kind) = token.to_pair();
+                    (!token.is_junk() && tok_kind == WordTokenKind::Word).then_some(tok)})
+                .collect::<Vec<_>>()
+                .join(" "))
+        } else {
+            from_utf8(&record[column_index])?
+        };
+        let txt = from_utf8(&record[column_index])?;
+        let lang_opt = detect_language(text.as_ref());
+        let txt_lang = if let Some(lang) = lang_opt {
+            lang.three_letter_code()
+        } else {
+            ""
+        };
+        println!("{:>60} | {:<60} | {:<3} | {}", txt.chars().take(60).collect::<String>(), text.chars().take(60).collect::<String>(), text.len(), txt_lang);
         let cell = if let Some(lang) = lang_opt {
             if self.full_name {
                 lang.eng_name()
@@ -77,6 +104,14 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
         writer.write_byte_record(&headers)?;
     }
 
+    let tokenizer = if args.filter_ease {
+        Some(WordTokenizer::new())
+    } else {
+        None
+    };
+    println!("{:>60} | {:<60} | len | {}", "original", "tokenize [w/o junk]", "whichlang");
+
+    println!("--------------------------------------------------------------------------------------------------------------------------------------------");
     if let Some(t) = args.parallelization.threads() {
         for result in reader.into_byte_records().chunks(64).parallel_map_custom(
             |o| o.threads(t),
@@ -85,7 +120,7 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
                     .into_iter()
                     .map(|result| -> CLIResult<ByteRecord> {
                         let mut record = result?;
-                        args.process_record(&mut record, column_index)?;
+                        args.process_record(&mut record, column_index, tokenizer.as_ref())?;
                         Ok(record)
                     })
                     .collect::<Result<Vec<_>, _>>()
@@ -99,10 +134,11 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
         let mut record = ByteRecord::new();
 
         while reader.read_byte_record(&mut record)? {
-            args.process_record(&mut record, column_index)?;
+            args.process_record(&mut record, column_index, tokenizer.as_ref())?;
             writer.write_byte_record(&record)?;
         }
     }
+    println!("--------------------------------------------------------------------------------------------------------------------------------------------");
 
     Ok(writer.flush()?)
 }

@@ -1,6 +1,7 @@
 use std::str::from_utf8;
 
 use clap::Args;
+use paltoquet::tokenizers::{WordTokenKind, WordTokenizer, WordTokenizerBuilder};
 use pariter::IteratorExt;
 use simd_csv::{ByteRecord, Selector};
 use whichlang::detect_language;
@@ -33,6 +34,10 @@ pub struct LangArgs {
     #[arg(short, long)]
     output: Option<String>,
 
+    /// Whether to filter the tokens that cannot have their lang detected in given text.
+    #[arg(long)]
+    tokenize: bool,
+
     #[command(flatten)]
     parallelization: ParallelizationArgs,
 
@@ -41,9 +46,23 @@ pub struct LangArgs {
 }
 
 impl LangArgs {
-    fn process_record(&self, record: &mut ByteRecord, column_index: usize) -> CLIResult<()> {
-        let text = &record[column_index];
-        let lang_opt = detect_language(from_utf8(text)?);
+    fn process_record(
+        &self,
+        record: &mut ByteRecord,
+        column_index: usize,
+        word_tokenizer: Option<&WordTokenizer>,
+    ) -> CLIResult<()> {
+        let text = if let Some(tokenizer) = word_tokenizer {
+            &(tokenizer
+                .tokenize(from_utf8(&record[column_index])?)
+                .map(|token| token.text)
+                .collect::<Vec<_>>()
+                .join(" "))
+        } else {
+            from_utf8(&record[column_index])?
+        };
+
+        let lang_opt = (!text.is_empty()).then_some(text).and_then(detect_language);
 
         let cell = if let Some(lang) = lang_opt {
             if self.full_name {
@@ -77,6 +96,13 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
         writer.write_byte_record(&headers)?;
     }
 
+    let tokenizer = args.tokenize.then(|| {
+        WordTokenizerBuilder::new()
+            .filter_junk()
+            .token_kind_whitelist([WordTokenKind::Word])
+            .build()
+    });
+
     if let Some(t) = args.parallelization.threads() {
         for result in reader.into_byte_records().chunks(64).parallel_map_custom(
             |o| o.threads(t),
@@ -85,7 +111,7 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
                     .into_iter()
                     .map(|result| -> CLIResult<ByteRecord> {
                         let mut record = result?;
-                        args.process_record(&mut record, column_index)?;
+                        args.process_record(&mut record, column_index, tokenizer.as_ref())?;
                         Ok(record)
                     })
                     .collect::<Result<Vec<_>, _>>()
@@ -99,7 +125,7 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
         let mut record = ByteRecord::new();
 
         while reader.read_byte_record(&mut record)? {
-            args.process_record(&mut record, column_index)?;
+            args.process_record(&mut record, column_index, tokenizer.as_ref())?;
             writer.write_byte_record(&record)?;
         }
     }

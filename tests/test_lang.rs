@@ -102,15 +102,16 @@ fn lang_parallel() {
 }
 
 #[test]
-fn lang_filter_ease() {
+fn lang_tokenize() {
     cmd()
         .arg("lang")
         .arg("sentence")
-        .arg("--filter-ease")
+        .arg("--tokenize")
         .write_csv_stdin(&[
             &["sentence"],
             &["this is an English sentence!!! 123 https://example.com 😊 zzzzzzzzz"],
             &["cette phrase est en français!!! 123 https://example.com 😊 zzzzzzzzz"],
+            &["https://example.com 🏳️‍🌈 👾 🎷 ⭐️ 🎺 ☀️ ☃️ 🏴‍☠️ 🧸 🧚‍♀️ 🍮 🍜 🍙 🌸 🦑 🪸 🎇 "],
         ])
         .assert_csv(&[
             &["sentence", "lang"],
@@ -122,19 +123,22 @@ fn lang_filter_ease() {
                 "cette phrase est en français!!! 123 https://example.com 😊 zzzzzzzzz",
                 "fra",
             ],
+
+            &["https://example.com 🏳️‍🌈 👾 🎷 ⭐️ 🎺 ☀️ ☃️ 🏴‍☠️ 🧸 🧚‍♀️ 🍮 🍜 🍙 🌸 🦑 🪸 🎇 ", ""],
         ]);
 }
 
 #[test]
-fn lang_filter_ease_parallel() {
+fn lang_tokenize_parallel() {
     cmd()
         .arg("lang")
         .arg("sentence")
-        .args(["--filter-ease", "-p"])
+        .args(["--tokenize", "-p"])
         .write_csv_stdin(&[
             &["sentence"],
             &["this is an English sentence!!! 123 https://example.com 😊 zzzzzzzzz"],
             &["cette phrase est en français!!! 123 https://example.com 😊 zzzzzzzzz"],
+            &["https://example.com 🏳️‍🌈 👾 🎷 ⭐️ 🎺 ☀️ ☃️ 🏴‍☠️ 🧸 🧚‍♀️ 🍮 🍜 🍙 🌸 🦑 🪸 🎇 "],
         ])
         .assert_csv(&[
             &["sentence", "lang"],
@@ -146,5 +150,6 @@ fn lang_filter_ease_parallel() {
                 "cette phrase est en français!!! 123 https://example.com 😊 zzzzzzzzz",
                 "fra",
             ],
+            &["https://example.com 🏳️‍🌈 👾 🎷 ⭐️ 🎺 ☀️ ☃️ 🏴‍☠️ 🧸 🧚‍♀️ 🍮 🍜 🍙 🌸 🦑 🪸 🎇 ", ""],
         ]);
 }

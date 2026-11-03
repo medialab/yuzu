@@ -112,6 +112,7 @@ fn lang_tokenize() {
             &["this is an English sentence!!! 123 https://example.com 😊 zzzzzzzzz"],
             &["cette phrase est en français!!! 123 https://example.com 😊 zzzzzzzzz"],
             &["https://example.com 🏳️‍🌈 👾 🎷 ⭐️ 🎺 ☀️ ☃️ 🏴‍☠️ 🧸 🧚‍♀️ 🍮 🍜 🍙 🌸 🦑 🪸 🎇 "],
+            &[""],
         ])
         .assert_csv(&[
             &["sentence", "lang"],
@@ -123,8 +124,11 @@ fn lang_tokenize() {
                 "cette phrase est en français!!! 123 https://example.com 😊 zzzzzzzzz",
                 "fra",
             ],
-
-            &["https://example.com 🏳️‍🌈 👾 🎷 ⭐️ 🎺 ☀️ ☃️ 🏴‍☠️ 🧸 🧚‍♀️ 🍮 🍜 🍙 🌸 🦑 🪸 🎇 ", ""],
+            &[
+                "https://example.com 🏳️‍🌈 👾 🎷 ⭐️ 🎺 ☀️ ☃️ 🏴‍☠️ 🧸 🧚‍♀️ 🍮 🍜 🍙 🌸 🦑 🪸 🎇 ",
+                "",
+            ],
+            &["", ""],
         ]);
 }
 
@@ -139,6 +143,7 @@ fn lang_tokenize_parallel() {
             &["this is an English sentence!!! 123 https://example.com 😊 zzzzzzzzz"],
             &["cette phrase est en français!!! 123 https://example.com 😊 zzzzzzzzz"],
             &["https://example.com 🏳️‍🌈 👾 🎷 ⭐️ 🎺 ☀️ ☃️ 🏴‍☠️ 🧸 🧚‍♀️ 🍮 🍜 🍙 🌸 🦑 🪸 🎇 "],
+            &[""],
         ])
         .assert_csv(&[
             &["sentence", "lang"],
@@ -150,6 +155,10 @@ fn lang_tokenize_parallel() {
                 "cette phrase est en français!!! 123 https://example.com 😊 zzzzzzzzz",
                 "fra",
             ],
-            &["https://example.com 🏳️‍🌈 👾 🎷 ⭐️ 🎺 ☀️ ☃️ 🏴‍☠️ 🧸 🧚‍♀️ 🍮 🍜 🍙 🌸 🦑 🪸 🎇 ", ""],
+            &[
+                "https://example.com 🏳️‍🌈 👾 🎷 ⭐️ 🎺 ☀️ ☃️ 🏴‍☠️ 🧸 🧚‍♀️ 🍮 🍜 🍙 🌸 🦑 🪸 🎇 ",
+                "",
+            ],
+            &["", ""],
         ]);
 }

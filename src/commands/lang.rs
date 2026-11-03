@@ -55,19 +55,14 @@ impl LangArgs {
         let text = if let Some(tokenizer) = word_tokenizer {
             &(tokenizer
                 .tokenize(from_utf8(&record[column_index])?)
-                .filter_map(|token| {
-                    let (tok, tok_kind) = token.to_pair();
-                    (tok_kind == WordTokenKind::Word).then_some(tok)
-                })
+                .map(|token| token.text)
                 .collect::<Vec<_>>()
                 .join(" "))
         } else {
             from_utf8(&record[column_index])?
         };
 
-        let lang_opt = (!text.is_empty())
-            .then_some(text)
-            .and_then(|t| detect_language(t.as_ref()));
+        let lang_opt = (!text.is_empty()).then_some(text).and_then(detect_language);
 
         let cell = if let Some(lang) = lang_opt {
             if self.full_name {
@@ -101,7 +96,12 @@ pub fn action(args: LangArgs) -> CLIResult<()> {
         writer.write_byte_record(&headers)?;
     }
 
-    let tokenizer = args.tokenize.then(|| WordTokenizerBuilder::new().filter_junk().build());
+    let tokenizer = args.tokenize.then(|| {
+        WordTokenizerBuilder::new()
+            .filter_junk()
+            .token_kind_whitelist([WordTokenKind::Word])
+            .build()
+    });
 
     if let Some(t) = args.parallelization.threads() {
         for result in reader.into_byte_records().chunks(64).parallel_map_custom(

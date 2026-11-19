@@ -29,16 +29,20 @@ pub struct EmbedArgs {
     #[arg(long)]
     list_models: bool,
 
-    /// Id of the model on HuggingFace. Defaults to ibm-granite/granite-embedding-107m-multilingual.
-    #[arg(short, long)]
-    model: Option<EmbeddingModel>,
+    /// Id of the model on HuggingFace.
+    #[arg(
+        short, long,
+        default_value = "ibm-granite/granite-embedding-107m-multilingual",
+        value_name = "model"
+    )]
+    model: EmbeddingModel,
 
     /// Chunk size in number of rows. Rows in the same chunk are encoded simultaneously.
-    #[arg(long, default_value = "16")]
+    #[arg(long, default_value = "16", value_name = "n")]
     chunk_size: NonZeroUsize,
 
     /// Batch size in number of rows. Rows in the same batch are loaded in memory together and sorted on text length.
-    #[arg(long, default_value = "2048", allow_hyphen_values = true)]
+    #[arg(long, default_value = "2048", value_name = "n", allow_hyphen_values = true)]
     batch_size: DynamicUsize,
 
     /// Whether to resume from an aborted run. Requires -o/--output to be given.
@@ -51,7 +55,7 @@ pub struct EmbedArgs {
 
     /// Path to output file. Will infer the format (CSV or numpy) depending on the extension (.csv or .npy)
     /// Will write in CSV to stdout if not given or if path is "-".
-    #[arg(short, long)]
+    #[arg(short, long, value_name = "path")]
     output: Option<String>,
 
     #[command(flatten)]
@@ -102,13 +106,12 @@ pub fn action(args: EmbedArgs) -> CLIResult<()> {
 
     let text_column_index = reader.select_one(args.text_column.as_ref().unwrap())?;
     let output = Output::maybe_resume(&args.output, args.resume)?;
-    let model = args.model.unwrap_or_default();
-    let mut writer = output.vector_writer(model.dim)?;
+    let mut writer = output.vector_writer(args.model.dim)?;
 
-    let mut embedder = model.embedder(threads)?;
+    let mut embedder = args.model.embedder(threads)?;
 
     if !output.can_resume && reader.has_headers() {
-        writer.write_headers(reader.byte_headers()?, model.dim, "dim_")?;
+        writer.write_headers(reader.byte_headers()?, args.model.dim, "dim_")?;
     }
 
     let default_batch_len = args.batch_size.as_usize().unwrap_or(1024);

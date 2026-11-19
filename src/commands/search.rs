@@ -26,24 +26,28 @@ pub struct SearchArgs {
     list_models: bool,
 
     /// CSV column containing the embedded text.
-    #[arg(short = 's', long, default_value = "dim_*", value_name = "COLS")]
+    #[arg(short = 's', long, default_value = "dim_*", value_name = "cols")]
     embedded_column: Selector,
 
     /// Name of the column containing the cosine similarity.
-    #[arg(long, default_value = "similarity_column", value_name = "NAME")]
+    #[arg(long, default_value = "similarity_column", value_name = "name")]
     similarity_column: String,
 
     /// Number of most cosine-similar rows to return.
-    #[arg(short = 'l', long, default_value = "10", value_name = "NUMBER")]
+    #[arg(short = 'l', long, default_value = "10", value_name = "n")]
     limit: usize,
 
     /// Id of the model on HuggingFace.
-    #[arg(short, default_value = "ibm-granite/granite-embedding-107m-multilingual", long)]
+    #[arg(
+        short, long,
+        default_value = "ibm-granite/granite-embedding-107m-multilingual",
+        value_name = "model"
+    )]
     model: EmbeddingModel,
 
     /// Path to output file. Will infer the format (CSV or numpy) depending on the extension (.csv or .npy)
     /// Will write in CSV to stdout if not given or if path is "-".
-    #[arg(short, long)]
+    #[arg(short, long, value_name = "path")]
     output: Option<String>,
 
     /// Whether to drop the embedded column.
@@ -71,7 +75,7 @@ pub fn action(args: SearchArgs) -> CLIResult<()> {
 
     let query = embedder.embed(vec!(args.query))?
                                   .pop().unwrap();
-    let norm_query = query.iter().fold(0 as f32, |s, &x| s+x*x);
+    let norm_query = query.iter().fold(0 as f32, |s, &x| s+x*x).sqrt();
 
     let mut reader = io::Input::new(&args.input)
         .delimiter(args.common.delimiter)
@@ -104,16 +108,16 @@ pub fn action(args: SearchArgs) -> CLIResult<()> {
         let embedded = embedded_columns.select(&record).enumerate().map(|(i,e)| fast_float::parse(e).unwrap_or_else({
             |err| {println!("Erreur: Unvalid float parse on row {row} for dimension {i}.\n {err}"); 0 as f32}
         })).collect::<Vec<f32>>();
-        let (dot_prod, norm_embed ) = query.iter().zip(embedded.iter()).fold(
+        let (dot_prod, squared_norm_embed ) = query.iter().zip(embedded.iter()).fold(
             (0 as f32, 0 as f32), |(dot, norm), (q, e)| (dot+q*e, norm+e*e)
         );
-        let cos_sim = dot_prod / (norm_embed.sqrt() * norm_query.sqrt());
-        heap.push_with( OrderedFloat(cos_sim), || {record.clone()});
+        let pre_cos_sim = dot_prod / squared_norm_embed.sqrt();
+        heap.push_with( OrderedFloat(pre_cos_sim), || {
+            [(pre_cos_sim / norm_query).to_string().as_bytes()].into_iter().chain(out_sel.select(&record)).collect::<ByteRecord>()});
     }
 
-    for (cos_sim, record) in heap.into_sorted_vec() {
-        let out_row = [cos_sim.to_string().as_bytes()].into_iter().chain(out_sel.select(&record)).collect::<ByteRecord>();
-        writer.write_byte_record(&out_row)?;
+    for (_, record) in heap.into_sorted_vec() {
+        writer.write_byte_record(&record)?;
     }
 
     Ok(())

@@ -22,15 +22,15 @@ pub struct LangArgs {
     full_name: bool,
 
     /// Name of the added column containing detected lang.
-    #[arg(long, default_value = "lang")]
+    #[arg(long, default_value = "lang", value_name = "name")]
     lang_column: String,
 
     /// Default value to use when lang cannot be detected.
-    #[arg(long, default_value = "")]
+    #[arg(long, default_value = "", value_name = "value")]
     default: String,
 
     /// Path to output file. Will write to stdout if not given or if path is "-".
-    #[arg(short, long)]
+    #[arg(short, long, value_name = "path")]
     output: Option<String>,
 
     #[command(flatten)]

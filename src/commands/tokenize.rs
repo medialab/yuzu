@@ -50,31 +50,37 @@ pub struct TokenizeArgs {
     #[arg(long)]
     list_models: bool,
 
-    /// Id of the model on HuggingFace. Defaults to ibm-granite/granite-embedding-107m-multilingual.
-    #[arg(short, long)]
-    model: Option<EmbeddingModel>,
+    /// Id of the model on HuggingFace.
+    #[arg(
+        short, long,
+        default_value = "ibm-granite/granite-embedding-107m-multilingual",
+        value_name = "model"
+    )]
+    model: EmbeddingModel,
 
     /// Chunk size in number of rows.
-    #[arg(long, default_value = "32")]
+    #[arg(long, default_value = "32", value_name = "n")]
     chunk_size: NonZeroUsize,
 
     /// If given, will count the number of tokens instead. Cannot be used with --explode nor --fits.
+    /// --keep will be automatically set to true.
     #[arg(long)]
     count: bool,
 
-    /// If given, will display a boolean indicating whether the number of tokens fits in the chosen
-    /// model's context window. Cannot be used with --explode nor --count.
+    /// If given, will display a boolean indicating whether the number of tokens fits
+    /// in the chosen model's context window. Cannot be used with --explode nor --count.
+    /// --keep will be automatically set to true.
     #[arg(long)]
     fits: bool,
 
     /// Name of the column to append. Defaults to "tokens", or "token" when used with --explode
-    /// or "token_count" when used with --count.
-    #[arg(short, long)]
+    /// or "token_count" when used with --count or "fits" when used with --fits.
+    #[arg(short, long, value_name = "name")]
     column: Option<String>,
 
     /// Separator to use when joining the tokens in the output. The default space character used to
     /// do so is usually safe since most models normalize spaces in the tokens for easier debugging.
-    #[arg(long, default_value = " ")]
+    #[arg(long, default_value = " ", value_name = "text")]
     sep: String,
 
     /// Whether to keep the tokenized column.
@@ -88,7 +94,7 @@ pub struct TokenizeArgs {
 
     /// Path to output file. Will infer the format (CSV or numpy) depending on the extension (.csv or .npy)
     /// Will write in CSV to stdout if not given or if path is "-".
-    #[arg(short, long)]
+    #[arg(short, long, value_name = "path")]
     output: Option<String>,
 
     #[command(flatten)]
@@ -103,6 +109,15 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
         Err("--count is not compatible with --explode!")?;
     }
 
+    if args.explode && args.fits {
+        Err("--fits is not compatible with --explode!")?;
+    }
+
+    if args.fits && args.count {
+        Err("--count is not compatible with --fits!")?;
+    }
+
+
     if args.list_models {
         print_models_list();
         return Ok(());
@@ -110,8 +125,7 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
 
     args.parallelization.build_rayon_global_thread_pool();
 
-    let model = args.model.unwrap_or_default();
-    let tokenizer = model.tokenizer()?;
+    let tokenizer = args.model.tokenizer()?;
 
     let mut reader = io::Input::new(&args.input)
         .delimiter(args.common.delimiter)
@@ -169,7 +183,7 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
         let encodings = tokenizer.encode_batch(texts, true)?;
 
         for (record, encoding) in records.iter_mut().zip(encodings.into_iter()) {
-            let tokens = &encoding.get_tokens()[unpadded_range(&encoding, model.padding_direction)];
+            let tokens = &encoding.get_tokens()[unpadded_range(&encoding, args.model.padding_direction)];
 
             if args.explode {
                 for token in tokens {
@@ -182,7 +196,7 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
                 if args.count {
                     record.fmt_field(&tokens.len());
                 } else if args.fits {
-                    record.push_field(if tokens.len() < model.max_length {
+                    record.push_field(if tokens.len() < args.model.max_length {
                         "true".as_bytes()
                     } else {
                         "false".as_bytes()

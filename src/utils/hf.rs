@@ -139,6 +139,8 @@ pub static SUPPORTED_MODELS: [&str; 4] = [
     "Lajavaness/sentence-camembert-large",
 ];
 
+pub static DEFAULT_MODEL: &str = "granite";
+
 pub fn print_models_list() {
     use colored::Colorize;
 

@@ -76,9 +76,8 @@ pub struct CommonArgs {
     /// When set, first row of CSV input will not be interpreted as a header.
     #[arg(short, long)]
     no_headers: bool,
-    /// The field delimiter for reading CSV data. Must be a single character.
-    /// Will default to a comma.
-    #[arg(short, long)]
+    /// The field delimiter for reading CSV data. Must be a single character. Will default to a comma.
+    #[arg(short, long, value_name = "char")]
     delimiter: Option<utils::io::Delimiter>,
 }
 
@@ -91,8 +90,8 @@ pub struct ParallelizationArgs {
     #[arg(short, long)]
     parallel: bool,
     /// Parallelize computations using this many threads. Use -p/--parallel
-    /// if you want the numbe of threads to be automatically chosen instead.
-    #[arg(short, long)]
+    /// if you want the number of threads to be automatically chosen instead.
+    #[arg(short, long, value_name = "n")]
     threads: Option<NonZeroUsize>,
 }
 

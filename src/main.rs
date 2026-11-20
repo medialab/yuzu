@@ -1,3 +1,5 @@
+extern crate fast_float2 as fast_float;
+
 use ort::session::builder::SessionBuilder;
 use std::io;
 use std::num::NonZeroUsize;
@@ -120,6 +122,7 @@ impl ParallelizationArgs {
 enum Commands {
     Embed(commands::embed::EmbedArgs),
     Lang(commands::lang::LangArgs),
+    Search(commands::search::SearchArgs),
     Tokenize(commands::tokenize::TokenizeArgs),
 }
 
@@ -129,6 +132,7 @@ fn main() {
     let result = match args.command {
         Some(Commands::Embed(args)) => commands::embed::action(args),
         Some(Commands::Lang(args)) => commands::lang::action(args),
+        Some(Commands::Search(args)) => commands::search::action(args),
         Some(Commands::Tokenize(args)) => commands::tokenize::action(args),
         None => Ok(()),
     };

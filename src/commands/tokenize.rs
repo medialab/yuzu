@@ -6,7 +6,7 @@ use clap::Args;
 use simd_csv::{ByteRecord, Selection, Selector};
 use tokenizers::{Encoding, PaddingDirection};
 
-use crate::utils::hf::{EmbeddingModel, print_models_list};
+use crate::utils::hf::{DEFAULT_MODEL, EmbeddingModel, print_models_list};
 use crate::utils::{io, iter::IteratorExt};
 use crate::{CLIResult, CommonArgs, ParallelizationArgs};
 
@@ -53,7 +53,7 @@ pub struct TokenizeArgs {
     /// Id of the model on HuggingFace.
     #[arg(
         short, long,
-        default_value = "ibm-granite/granite-embedding-107m-multilingual",
+        default_value = DEFAULT_MODEL,
         value_name = "model"
     )]
     model: EmbeddingModel,
@@ -116,7 +116,6 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
     if args.fits && args.count {
         Err("--count is not compatible with --fits!")?;
     }
-
 
     if args.list_models {
         print_models_list();
@@ -183,7 +182,8 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
         let encodings = tokenizer.encode_batch(texts, true)?;
 
         for (record, encoding) in records.iter_mut().zip(encodings.into_iter()) {
-            let tokens = &encoding.get_tokens()[unpadded_range(&encoding, args.model.padding_direction)];
+            let tokens =
+                &encoding.get_tokens()[unpadded_range(&encoding, args.model.padding_direction)];
 
             if args.explode {
                 for token in tokens {

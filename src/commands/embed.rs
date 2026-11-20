@@ -7,7 +7,7 @@ use clap::Args;
 use rayon::prelude::*;
 use simd_csv::{ByteRecord, Selector};
 
-use crate::utils::hf::{EmbeddingModel, print_models_list};
+use crate::utils::hf::{DEFAULT_MODEL, EmbeddingModel, print_models_list};
 use crate::utils::io::{DynamicUsize, Input, Output};
 use crate::utils::iter::IteratorExt;
 use crate::utils::readers::ReaderExt;
@@ -31,8 +31,9 @@ pub struct EmbedArgs {
 
     /// Id of the model on HuggingFace.
     #[arg(
-        short, long,
-        default_value = "ibm-granite/granite-embedding-107m-multilingual",
+        short,
+        long,
+        default_value = DEFAULT_MODEL,
         value_name = "model"
     )]
     model: EmbeddingModel,
@@ -42,7 +43,12 @@ pub struct EmbedArgs {
     chunk_size: NonZeroUsize,
 
     /// Batch size in number of rows. Rows in the same batch are loaded in memory together and sorted on text length.
-    #[arg(long, default_value = "2048", value_name = "n", allow_hyphen_values = true)]
+    #[arg(
+        long,
+        default_value = "2048",
+        value_name = "n",
+        allow_hyphen_values = true
+    )]
     batch_size: DynamicUsize,
 
     /// Whether to resume from an aborted run. Requires -o/--output to be given.

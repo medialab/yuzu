@@ -51,8 +51,8 @@ pub struct SearchArgs {
     output: Option<String>,
 
     /// Whether to drop the embedded column.
-    #[arg(short = 'D', long)]
-    drop: bool,
+    #[arg(short, long)]
+    keep: bool,
 
     #[command(flatten)]
     parallelization: ParallelizationArgs,
@@ -75,7 +75,7 @@ pub fn action(args: SearchArgs) -> CLIResult<()> {
 
     let query = embedder.embed(vec!(args.query))?
                                   .pop().unwrap();
-    let norm_query = query.iter().fold(0 as f32, |s, &x| s+x*x).sqrt();
+    let norm_query = query.iter().fold(0.0_f32, |s, &x| s+x*x).sqrt();
 
     let mut reader = io::Input::new(&args.input)
         .delimiter(args.common.delimiter)
@@ -86,10 +86,11 @@ pub fn action(args: SearchArgs) -> CLIResult<()> {
 
     let embedded_columns = reader.select(&args.embedded_column)?;
 
-    let out_sel = if args.drop {
-        embedded_columns.inverse()
-    } else {
+    let out_sel = if args.keep {
         Selection::full(headers.len())
+    } else {
+        embedded_columns.inverse()
+
     };
 
     let mut writer = io::Output::new(&args.output).csv_writer()?;
@@ -103,21 +104,27 @@ pub fn action(args: SearchArgs) -> CLIResult<()> {
     let mut heap = TopKHeapMap::<OrderedFloat<f32>, ByteRecord>::new(args.limit);
 
     let mut row = 0;
+    let mut embedded: Vec<f32> = Vec::with_capacity(embedded_columns.len());
     while reader.read_byte_record(&mut record)? {
         row += 1;
-        let embedded = embedded_columns.select(&record).enumerate().map(|(i,e)| fast_float::parse(e).unwrap_or_else({
-            |err| {println!("Erreur: Unvalid float parse on row {row} for dimension {i}.\n {err}"); 0 as f32}
-        })).collect::<Vec<f32>>();
+        for (i, e) in embedded_columns.select(&record).enumerate() {
+            embedded.push(fast_float::parse(e).map_err(
+                |err| format!("Erreur: Unvalid float parse on row {row} for dimension {i}.\n {err}")
+            )?);
+        }
         let (dot_prod, squared_norm_embed ) = query.iter().zip(embedded.iter()).fold(
             (0 as f32, 0 as f32), |(dot, norm), (q, e)| (dot+q*e, norm+e*e)
         );
         let pre_cos_sim = dot_prod / squared_norm_embed.sqrt();
         heap.push_with( OrderedFloat(pre_cos_sim), || {
-            [(pre_cos_sim / norm_query).to_string().as_bytes()].into_iter().chain(out_sel.select(&record)).collect::<ByteRecord>()});
+            out_sel.select(&record).collect::<ByteRecord>()
+        });
+        embedded.clear();
     }
 
-    for (_, record) in heap.into_sorted_vec() {
-        writer.write_byte_record(&record)?;
+    for (pre_cos_sim, record) in heap.into_sorted_vec() {
+        let out_row = [(pre_cos_sim / norm_query).to_string().as_bytes()].into_iter().chain(&record).collect::<ByteRecord>();
+        writer.write_byte_record(&out_row)?;
     }
 
     Ok(())

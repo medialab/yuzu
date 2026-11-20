@@ -69,15 +69,19 @@ struct YuzuArgs {
     command: Option<Commands>,
 }
 
+const COMMON_HELP_HEADER: &str = "Common Options";
+
 #[derive(Args, Debug, Clone)]
 pub struct CommonArgs {
     /// When set, first row of CSV input will not be interpreted as a header.
-    #[arg(short, long)]
+    #[arg(short, long, help_heading = COMMON_HELP_HEADER)]
     no_headers: bool,
     /// The field delimiter for reading CSV data. Must be a single character. Will default to a comma.
-    #[arg(short, long, value_name = "char")]
+    #[arg(short, long, value_name = "char", help_heading = COMMON_HELP_HEADER)]
     delimiter: Option<utils::io::Delimiter>,
 }
+
+const PARALLEL_HELP_HEADER: &str = "Parallelization Options";
 
 #[derive(Args, Debug, Clone)]
 pub struct ParallelizationArgs {
@@ -85,11 +89,11 @@ pub struct ParallelizationArgs {
     /// Will automatically select a suitable number of threads to use based on
     /// your number of cores. Use -t/--threads if you want to indicate the
     /// number of threads yourself.
-    #[arg(short, long)]
+    #[arg(short, long, help_heading = PARALLEL_HELP_HEADER)]
     parallel: bool,
     /// Parallelize computations using this many threads. Use -p/--parallel
     /// if you want the number of threads to be automatically chosen instead.
-    #[arg(short, long, value_name = "n")]
+    #[arg(short, long, value_name = "n", help_heading = PARALLEL_HELP_HEADER)]
     threads: Option<NonZeroUsize>,
 }
 

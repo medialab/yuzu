@@ -54,19 +54,22 @@ lto = false
 anyhow = "1.0.104"
 clap = { version = "4.5.51", features = ["color", "derive", "wrap_help"] }
 colored = "3.1.1"
+fast-float2 = "0.2.4"
 flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs"] }
 hf-hub = "0.4.3"
 ndarray = "0.17.2"
 npyz = "0.9.1"
 num_cpus = "1.17.0"
+ordered-float = "5.4.0"
 ort = "2.0.0-rc.13"
 paltoquet = "0.12.0"
 pariter = "0.6.0"
+phylacter = "0.4.0"
 rayon = "1.12.0"
 serde = { version = "1", features = ["rc"] }
 serde_derive = "1"
 serde_json = "1.0"
-simd-csv = { version = "0.14.0", features = ["str"] }
+simd-csv = { git = "https://github.com/medialab/simd-csv", rev = "cc3624ec", features = ["str"] }
 tokenizers = "0.23.2"
 whichlang = { git = "https://github.com/medialab/whichlang", rev = "92591fa2" }
 zstd = "0.14.0"

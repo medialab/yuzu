@@ -3,7 +3,7 @@ use simd_csv::{ByteRecord, Selection, Selector};
 use phylacter::TopKHeapMap;
 use ordered_float::OrderedFloat;
 
-use crate::utils::hf::{EmbeddingModel, print_models_list};
+use crate::utils::hf::{DEFAULT_MODEL, EmbeddingModel, print_models_list};
 use crate::utils::io;
 use crate::{CLIResult, CommonArgs, ParallelizationArgs};
 
@@ -26,8 +26,8 @@ pub struct SearchArgs {
     list_models: bool,
 
     /// CSV column containing the embedded text.
-    #[arg(short = 's', long, default_value = "dim_*", value_name = "cols")]
-    embedded_column: Selector,
+    #[arg(short, long, default_value = "dim_*", value_name = "cols")]
+    select: Selector,
 
     /// Name of the column containing the cosine similarity.
     #[arg(long, default_value = "similarity_column", value_name = "name")]
@@ -40,13 +40,12 @@ pub struct SearchArgs {
     /// Id of the model on HuggingFace.
     #[arg(
         short, long,
-        default_value = "ibm-granite/granite-embedding-107m-multilingual",
+        default_value = DEFAULT_MODEL,
         value_name = "model"
     )]
     model: EmbeddingModel,
 
-    /// Path to output file. Will infer the format (CSV or numpy) depending on the extension (.csv or .npy)
-    /// Will write in CSV to stdout if not given or if path is "-".
+    /// Path to output file. Will write to stdout if not given or if path is "-".
     #[arg(short, long, value_name = "path")]
     output: Option<String>,
 
@@ -84,7 +83,7 @@ pub fn action(args: SearchArgs) -> CLIResult<()> {
 
     let headers: ByteRecord = reader.byte_headers()?.clone();
 
-    let embedded_columns = reader.select(&args.embedded_column)?;
+    let embedded_columns = reader.select(&args.select)?;
 
     let out_sel = if args.keep {
         Selection::full(headers.len())
@@ -106,24 +105,24 @@ pub fn action(args: SearchArgs) -> CLIResult<()> {
     let mut row = 0;
     let mut embedded: Vec<f32> = Vec::with_capacity(embedded_columns.len());
     while reader.read_byte_record(&mut record)? {
-        row += 1;
         for (i, e) in embedded_columns.select(&record).enumerate() {
             embedded.push(fast_float::parse(e).map_err(
-                |err| format!("Erreur: Unvalid float parse on row {row} for dimension {i}.\n {err}")
+                |err| format!("Erreur: Invalid float parse on row {row} for dimension {i}.\n {err}")
             )?);
         }
         let (dot_prod, squared_norm_embed ) = query.iter().zip(embedded.iter()).fold(
             (0 as f32, 0 as f32), |(dot, norm), (q, e)| (dot+q*e, norm+e*e)
         );
-        let pre_cos_sim = dot_prod / squared_norm_embed.sqrt();
-        heap.push_with( OrderedFloat(pre_cos_sim), || {
+        let cos_sim = dot_prod / squared_norm_embed.sqrt();
+        heap.push_with( OrderedFloat(cos_sim), || {
             out_sel.select(&record).collect::<ByteRecord>()
         });
         embedded.clear();
+        row += 1;
     }
 
-    for (pre_cos_sim, record) in heap.into_sorted_vec() {
-        let out_row = [(pre_cos_sim / norm_query).to_string().as_bytes()].into_iter().chain(&record).collect::<ByteRecord>();
+    for (cos_sim, record) in heap.into_sorted_vec() {
+        let out_row = [(cos_sim / norm_query).to_string().as_bytes()].into_iter().chain(&record).collect::<ByteRecord>();
         writer.write_byte_record(&out_row)?;
     }
 

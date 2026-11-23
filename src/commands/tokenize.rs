@@ -178,22 +178,20 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
     if reader.has_headers() {
         let mut new_headers: ByteRecord = out_sel.select(&headers).collect();
 
-        macro_rules! push_column_name_or {
-            ($token_column:expr, $default:expr) => {
-                new_headers.push_field(
-                    $token_column
-                        .as_ref()
-                        .map_or($default, |name| name.as_bytes()),
-                );
-            };
-        }
+        let mut push_column_name_or = |token_column: Option<String>, default| {
+            new_headers.push_field(
+                token_column
+                    .as_ref()
+                    .map_or(default, |name| name.as_bytes()),
+            )
+        };
 
         if args.explode {
-            push_column_name_or!(args.token_column, &b"token"[..]);
+            push_column_name_or(args.token_column, &b"token"[..]);
         } else {
-            if have_tokens_col { push_column_name_or!(args.token_column, &b"tokens"[..]); }
-            if args.count { push_column_name_or!(args.count_column, &b"token_count"[..]); }
-            if args.fits { push_column_name_or!(args.fits_column, &b"fits"[..]); }
+            if have_tokens_col { push_column_name_or(args.token_column, &b"tokens"[..]); }
+            if args.count { push_column_name_or(args.count_column, &b"token_count"[..]); }
+            if args.fits { push_column_name_or(args.fits_column, &b"fits"[..]); }
         }
 
         writer.write_byte_record(&new_headers)?;

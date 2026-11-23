@@ -1,12 +1,11 @@
 use clap::Args;
-use simd_csv::{ByteRecord, Selection, Selector};
-use phylacter::TopKHeapMap;
 use ordered_float::OrderedFloat;
+use phylacter::TopKHeapMap;
+use simd_csv::{ByteRecord, Selection, Selector};
 
 use crate::utils::hf::{DEFAULT_MODEL, EmbeddingModel, print_models_list};
 use crate::utils::io;
 use crate::{CLIResult, CommonArgs, ParallelizationArgs};
-
 
 #[derive(Args, Debug)]
 #[command(
@@ -61,7 +60,6 @@ pub struct SearchArgs {
 }
 
 pub fn action(args: SearchArgs) -> CLIResult<()> {
-
     if args.list_models {
         print_models_list();
         return Ok(());
@@ -72,9 +70,8 @@ pub fn action(args: SearchArgs) -> CLIResult<()> {
     let model = args.model;
     let mut embedder = model.embedder(threads)?;
 
-    let query = embedder.embed(vec!(args.query))?
-                                  .pop().unwrap();
-    let norm_query = query.iter().fold(0.0_f32, |s, &x| s+x*x).sqrt();
+    let query = embedder.embed(vec![args.query])?.pop().unwrap();
+    let norm_query = query.iter().fold(0.0_f32, |s, &x| s + x * x).sqrt();
 
     let mut reader = io::Input::new(&args.input)
         .delimiter(args.common.delimiter)
@@ -89,13 +86,15 @@ pub fn action(args: SearchArgs) -> CLIResult<()> {
         Selection::full(headers.len())
     } else {
         embedded_columns.inverse()
-
     };
 
     let mut writer = io::Output::new(&args.output).csv_writer()?;
 
     if reader.has_headers() {
-        let out_headers = [args.similarity_column.as_bytes()].into_iter().chain(out_sel.select(&headers)).collect::<ByteRecord>();
+        let out_headers = [args.similarity_column.as_bytes()]
+            .into_iter()
+            .chain(out_sel.select(&headers))
+            .collect::<ByteRecord>();
         writer.write_byte_record(&out_headers)?;
     }
 
@@ -106,15 +105,18 @@ pub fn action(args: SearchArgs) -> CLIResult<()> {
     let mut embedded: Vec<f32> = Vec::with_capacity(embedded_columns.len());
     while reader.read_byte_record(&mut record)? {
         for (i, e) in embedded_columns.select(&record).enumerate() {
-            embedded.push(fast_float::parse(e).map_err(
-                |err| format!("Erreur: Invalid float parse on row {row} for dimension {i}.\n {err}")
-            )?);
+            embedded.push(fast_float::parse(e).map_err(|err| {
+                format!("Erreur: Invalid float parse on row {row} for dimension {i}.\n {err}")
+            })?);
         }
-        let (dot_prod, squared_norm_embed ) = query.iter().zip(embedded.iter()).fold(
-            (0 as f32, 0 as f32), |(dot, norm), (q, e)| (dot+q*e, norm+e*e)
-        );
+        let (dot_prod, squared_norm_embed) = query
+            .iter()
+            .zip(embedded.iter())
+            .fold((0 as f32, 0 as f32), |(dot, norm), (q, e)| {
+                (dot + q * e, norm + e * e)
+            });
         let cos_sim = dot_prod / squared_norm_embed.sqrt();
-        heap.push_with( OrderedFloat(cos_sim), || {
+        heap.push_with(OrderedFloat(cos_sim), || {
             out_sel.select(&record).collect::<ByteRecord>()
         });
         embedded.clear();
@@ -122,7 +124,10 @@ pub fn action(args: SearchArgs) -> CLIResult<()> {
     }
 
     for (cos_sim, record) in heap.into_sorted_vec() {
-        let out_row = [(cos_sim / norm_query).to_string().as_bytes()].into_iter().chain(&record).collect::<ByteRecord>();
+        let out_row = [(cos_sim / norm_query).to_string().as_bytes()]
+            .into_iter()
+            .chain(&record)
+            .collect::<ByteRecord>();
         writer.write_byte_record(&out_row)?;
     }
 

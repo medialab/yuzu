@@ -34,13 +34,6 @@ fn unpadded_range(encoding: &Encoding, direction: PaddingDirection) -> Range<usi
     }
 }
 
-enum Operation {
-    GetTokens,
-    Explode,
-    Counts,
-    Fits,
-}
-
 const COUNTS_HEADER: &str = "Count Tokens Options";
 
 #[derive(Args, Debug)]
@@ -87,7 +80,7 @@ pub struct TokenizeArgs {
     count: bool,
 
     /// Used with --counts. Name of the column to append the result of --counts.
-    #[arg(long,
+    #[arg(short, long,
         value_name = "name",
         help_heading = COUNTS_HEADER)]
     count_column: Option<String>,
@@ -99,7 +92,7 @@ pub struct TokenizeArgs {
     fits: bool,
 
     /// Used with --fits. Name of the column to append the result of --fits.
-    #[arg(long, value_name = "name", help_heading = COUNTS_HEADER)]
+    #[arg(short, long, value_name = "name", help_heading = COUNTS_HEADER)]
     fits_column: Option<String>,
 
     /// Whether to keep the tokenized column.

@@ -178,10 +178,9 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
     if reader.has_headers() {
         let mut new_headers: ByteRecord = out_sel.select(&headers).collect();
 
-        let mut new_columns_names: Vec<&[u8]> = Vec::with_capacity(2);
         macro_rules! push_column_name_or {
             ($token_column:expr, $default:expr) => {
-                new_columns_names.push(
+                new_headers.push_field(
                     $token_column
                         .as_ref()
                         .map_or($default, |name| name.as_bytes()),
@@ -196,8 +195,6 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
             if args.count { push_column_name_or!(args.count_column, &b"token_count"[..]); }
             if args.fits { push_column_name_or!(args.fits_column, &b"fits"[..]); }
         }
-
-        for field in new_columns_names { new_headers.push_field(field); }
 
         writer.write_byte_record(&new_headers)?;
     }

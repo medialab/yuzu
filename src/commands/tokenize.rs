@@ -121,7 +121,7 @@ pub struct TokenizeArgs {
 }
 
 pub fn action(args: TokenizeArgs) -> CLIResult<()> {
-    if args.explode{
+    if args.explode {
         if args.count {
             Err("--count is not compatible with --explode!")?;
         }
@@ -146,12 +146,14 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
         return Ok(());
     }
 
-    let have_tokens_col = !(args.count || args.fits) || args.keep_tokenized ;
+    let have_tokens_col = !(args.count || args.fits) || args.keep_tokenized;
 
     // !have_tokens_col -> !explode because (count || fits) -> !explode
     if !have_tokens_col && args.token_column.is_some() {
-        Err(concat!["You didn't ask to keep tokenized column but still gave it a name!",
-                    "Maybe you forgot --keep-tokenized?"])?;
+        Err(concat![
+            "You didn't ask to keep tokenized column but still gave it a name!",
+            "Maybe you forgot --keep-tokenized?"
+        ])?;
     }
 
     args.parallelization.build_rayon_global_thread_pool();
@@ -189,9 +191,15 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
         if args.explode {
             push_column_name_or(args.token_column, &b"token"[..]);
         } else {
-            if have_tokens_col { push_column_name_or(args.token_column, &b"tokens"[..]); }
-            if args.count { push_column_name_or(args.count_column, &b"token_count"[..]); }
-            if args.fits { push_column_name_or(args.fits_column, &b"fits"[..]); }
+            if have_tokens_col {
+                push_column_name_or(args.token_column, &b"tokens"[..]);
+            }
+            if args.count {
+                push_column_name_or(args.count_column, &b"token_count"[..]);
+            }
+            if args.fits {
+                push_column_name_or(args.fits_column, &b"fits"[..]);
+            }
         }
 
         writer.write_byte_record(&new_headers)?;

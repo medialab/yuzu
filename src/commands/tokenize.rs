@@ -10,6 +10,14 @@ use crate::utils::hf::{DEFAULT_MODEL, EmbeddingModel, print_models_list};
 use crate::utils::{io, iter::IteratorExt};
 use crate::{CLIResult, CommonArgs, ParallelizationArgs};
 
+#[derive(Debug, Clone)]
+enum Operation {
+    Tokens,
+    Explode,
+    Counts,
+    Fits
+}
+
 #[inline]
 fn unpadded_range(encoding: &Encoding, direction: PaddingDirection) -> Range<usize> {
     match direction {
@@ -33,8 +41,6 @@ fn unpadded_range(encoding: &Encoding, direction: PaddingDirection) -> Range<usi
         }
     }
 }
-
-const COUNTS_HEADER: &str = "Count Tokens Options";
 
 #[derive(Args, Debug)]
 pub struct TokenizeArgs {
@@ -64,40 +70,27 @@ pub struct TokenizeArgs {
     #[arg(long, default_value = "32", value_name = "n")]
     chunk_size: NonZeroUsize,
 
+    /// The results wanted from the tokenization. Wether it's 'tokens' (tokenized column),
+    /// 'counts' (number of tokens), 'fits' (fits in the context window of the model).
+    /// To have multiple outputs at once, separate your options with a comma (i.e. tokens,counts)
+    #[arg(short, long, default_value = "tokens")]
+    emit: String,
+
+    /// Csv-separable column names. Must be aligned with --emit. Will take sensible defaults.
+    /// (i.e. tokens, counts, and/or fits depending on the options requested).
+    #[arg(short, long)]
+    column_names: Option<String>,
+
     /// If given, "explode" the output by priting a copy of the record per token. This can be
     /// useful to compute aggregation at the token level. Cannot be used with --count nor --fits
     /// nor --keep-tokenized.
     #[arg(long)]
     explode: bool,
 
-    /// Name of the token column to append. Defaults to "tokens", or "token" when used with --explode.
-    #[arg(long, value_name = "name")]
-    token_column: Option<String>,
-
-    /// If given, will count the number of tokens instead. Cannot be used with --explode nor --fits.
-    /// --keep will be automatically set to true.
-    #[arg(long, help_heading = COUNTS_HEADER)]
-    count: bool,
-
-    /// Used with --counts. Name of the column to append the result of --counts.
-    #[arg(short, long,
-        value_name = "name",
-        help_heading = COUNTS_HEADER)]
-    count_column: Option<String>,
-
-    /// If given, will display a boolean indicating whether the number of tokens fits
-    /// in the chosen model's context window. Cannot be used with --explode nor --count.
-    /// --keep will be automatically set to true.
-    #[arg(long, help_heading = COUNTS_HEADER)]
-    fits: bool,
-
-    /// Used with --fits. Name of the column to append the result of --fits.
-    #[arg(short, long, value_name = "name", help_heading = COUNTS_HEADER)]
-    fits_column: Option<String>,
-
-    /// Whether to keep the tokenized column.
-    #[arg(long, help_heading = COUNTS_HEADER)]
-    keep_tokenized: bool,
+    /// csv-separable column names. Must be aligned with --emit and would take sensible defaults.
+    /// (i.e. "tokens", "count", and/or "fits" depending on those requested).
+    #[arg(long, default_value = "token")]
+    explode_name: String,
 
     /// Separator to use when joining the tokens in the output. The default space character used to
     /// do so is usually safe since most models normalize spaces in the tokens for easier debugging.
@@ -121,39 +114,40 @@ pub struct TokenizeArgs {
 }
 
 pub fn action(args: TokenizeArgs) -> CLIResult<()> {
-    if args.explode {
-        if args.count {
-            Err("--count is not compatible with --explode!")?;
-        }
-        if args.fits {
-            Err("--fits is not compatible with --explode!")?;
-        }
-        if args.keep_tokenized {
-            Err("Cannot keep original tokenized column if using --explode!")?;
-        }
-    }
-
-    if !args.count && args.count_column.is_some() {
-        Err("--count-column have to be used with --count!")?;
-    }
-
-    if !args.fits && args.fits_column.is_some() {
-        Err("--fits-column have to be used with --fits!")?;
-    }
-
     if args.list_models {
         print_models_list();
         return Ok(());
     }
 
-    let have_tokens_col = !(args.count || args.fits) || args.keep_tokenized;
+    let mut operations = Vec::new();
+    let mut col_names: Vec<Vec<u8>> = Vec::new();
 
-    // !have_tokens_col -> !explode because (count || fits) -> !explode
-    if !have_tokens_col && args.token_column.is_some() {
-        Err(concat![
-            "You didn't ask to keep tokenized column but still gave it a name!",
-            "Maybe you forgot --keep-tokenized?"
-        ])?;
+    let emit_ops = args.emit.split(",");
+    if let Some(column_names) = args.column_names {
+        let names = column_names.split(",");
+        if names.clone().count() != emit_ops.clone().count() {
+            Err("Number of column-names doesn't correspond to the number of columns emitted")?;
+        }
+
+        for (op, name) in emit_ops.zip(names) {
+            match op {
+                "tokens" => if !args.explode { operations.push(Operation::Tokens); col_names.push(name.as_bytes().to_vec()) }
+                            else { operations.push(Operation::Explode); col_names.push(args.explode_name.as_bytes().to_vec()) },
+                "counts" => { operations.push(Operation::Counts); col_names.push(name.as_bytes().to_vec()); }
+                "fits" => { operations.push(Operation::Fits); col_names.push(name.as_bytes().to_vec()); },
+                _ => Err("--emit did not receive a correct format (i.e. 'tokens,counts,fits' or less options)" )?,
+            }
+        }
+    } else {
+        for op in emit_ops {
+            match op {
+                "tokens" => if !args.explode { operations.push(Operation::Tokens); col_names.push(b"tokens".to_vec()) }
+                            else { operations.push(Operation::Explode); col_names.push(args.explode_name.as_bytes().to_vec()) },
+                "counts" => { operations.push(Operation::Counts); col_names.push(b"counts".to_vec()); }
+                "fits" => { operations.push(Operation::Fits); col_names.push(b"fits".to_vec()); },
+                _ => Err("--emit did not receive a correct format (i.e. 'tokens,counts,fits' or less options)" )?,
+            }
+        }
     }
 
     args.parallelization.build_rayon_global_thread_pool();
@@ -179,27 +173,8 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
 
     if reader.has_headers() {
         let mut new_headers: ByteRecord = out_sel.select(&headers).collect();
-
-        let mut push_column_name_or = |token_column: Option<String>, default| {
-            new_headers.push_field(
-                token_column
-                    .as_ref()
-                    .map_or(default, |name| name.as_bytes()),
-            )
-        };
-
-        if args.explode {
-            push_column_name_or(args.token_column, &b"token"[..]);
-        } else {
-            if have_tokens_col {
-                push_column_name_or(args.token_column, &b"tokens"[..]);
-            }
-            if args.count {
-                push_column_name_or(args.count_column, &b"token_count"[..]);
-            }
-            if args.fits {
-                push_column_name_or(args.fits_column, &b"fits"[..]);
-            }
+        for name in col_names {
+            new_headers.push_field(&name);
         }
 
         writer.write_byte_record(&new_headers)?;
@@ -224,30 +199,19 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
             let tokens =
                 &encoding.get_tokens()[unpadded_range(&encoding, args.model.padding_direction)];
 
-            if args.explode {
-                for token in tokens {
-                    record.truncate(out_sel.len());
-                    record.push_field(token.as_bytes());
-
-                    writer.write_byte_record(record)?;
+            for operation in &operations {
+                match operation {
+                    Operation::Tokens => record.push_field(tokens.join(&args.sep).as_bytes()),
+                    Operation::Counts => record.fmt_field(&tokens.len()),
+                    Operation::Fits => record.push_field(if tokens.len() < args.model.max_length
+                                                { "true".as_bytes() } else { "false".as_bytes() }),
+                    Operation::Explode => for token in tokens {
+                        record.truncate(out_sel.len());
+                        record.push_field(token.as_bytes());
+                    }
                 }
-            } else {
-                if have_tokens_col {
-                    record.push_field(tokens.join(&args.sep).as_bytes());
-                }
-                if args.count {
-                    record.fmt_field(&tokens.len());
-                }
-                if args.fits {
-                    record.push_field(if tokens.len() < args.model.max_length {
-                        "true".as_bytes()
-                    } else {
-                        "false".as_bytes()
-                    });
-                }
-
-                writer.write_byte_record(record)?;
             }
+            writer.write_byte_record(record)?;
         }
     }
 

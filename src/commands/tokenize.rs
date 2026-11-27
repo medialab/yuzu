@@ -1,20 +1,52 @@
 use std::num::NonZeroUsize;
 use std::ops::Range;
-use std::str::from_utf8;
+use std::str::{FromStr, from_utf8};
 
 use clap::Args;
 use simd_csv::{ByteRecord, Selection, Selector};
 use tokenizers::{Encoding, PaddingDirection};
 
 use crate::utils::hf::{DEFAULT_MODEL, EmbeddingModel, print_models_list};
-use crate::utils::{io, iter::IteratorExt};
+use crate::utils::{
+    io::{self, CsvNames},
+    iter::IteratorExt,
+};
 use crate::{CLIResult, CommonArgs, ParallelizationArgs};
 
 #[derive(Debug, Clone)]
 enum Operation {
     Tokens,
     Counts,
-    Fits
+    Fits,
+}
+
+impl Operation {
+    fn as_column_name(&self, plural: bool) -> &[u8] {
+        match self {
+            Self::Tokens => {
+                if plural {
+                    b"tokens"
+                } else {
+                    b"token"
+                }
+            }
+            Self::Counts => b"token_count",
+            Self::Fits => b"fits",
+        }
+    }
+}
+
+impl FromStr for Operation {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "token" | "tokens" => Self::Tokens,
+            "count" | "counts" | "token_count" => Self::Counts,
+            "fits" => Self::Fits,
+            _ => return Err(format!("unknown --emit type {s}")),
+        })
+    }
 }
 
 #[inline]
@@ -69,20 +101,28 @@ pub struct TokenizeArgs {
     #[arg(long, default_value = "32", value_name = "n")]
     chunk_size: NonZeroUsize,
 
-    /// The results wanted from the tokenization. Wether it's 'tokens' (tokenized column),
-    /// 'counts' (number of tokens), 'fits' (fits in the context window of the model).
-    /// To have multiple outputs at once, separate your options with a comma (i.e. tokens,counts)
-    #[arg(short, long, default_value = "tokens")]
-    emit: String,
+    /// Columns, separated by commas, that the tokenization process should emit:
+    ///     - "tokens": tokens joined by spaces or by what was given to --sep
+    ///                 or a single token when using --explode.
+    ///     - "count":  number of tokens
+    ///     - "fits":   whether the number of tokens fits in the model's context
+    ///                 window.
+    #[arg(
+        short,
+        long,
+        default_value = "tokens",
+        value_delimiter = ',',
+        verbatim_doc_comment
+    )]
+    emit: Vec<Operation>,
 
     /// Csv-separable column names. Must be aligned with --emit. Will take sensible defaults.
     /// (i.e. token(s), token_count, and/or fits depending on the options requested).
     #[arg(short, long)]
-    column_names: Option<String>,
+    column_names: Option<CsvNames>,
 
     /// If given, "explode" the output by priting a copy of the record per token. This can be
-    /// useful to compute aggregation at the token level. Cannot be used with --count nor --fits
-    /// nor --keep-tokenized.
+    /// useful to compute aggregation at the token level.
     #[arg(long)]
     explode: bool,
 
@@ -107,43 +147,30 @@ pub struct TokenizeArgs {
     common: CommonArgs,
 }
 
-pub fn action(args: TokenizeArgs) -> CLIResult<()> {
+pub fn action(mut args: TokenizeArgs) -> CLIResult<()> {
     if args.list_models {
         print_models_list();
         return Ok(());
     }
 
-    let mut operations = Vec::new();
-    let mut col_names: Vec<Vec<u8>> = Vec::new();
+    let col_names = args
+        .column_names
+        .take()
+        .map(CsvNames::into_record)
+        .unwrap_or_else(|| {
+            args.emit
+                .iter()
+                .map(|op| op.as_column_name(!args.explode))
+                .collect()
+        });
 
-    let emit_ops = args.emit.split(",");
-    if let Some(column_names) = args.column_names {
-        let names = column_names.split(",");
-        if names.clone().count() != emit_ops.clone().count() {
-            Err("Number of column-names doesn't correspond to the number of columns emitted")?;
-        }
-
-        for (op, name) in emit_ops.zip(names) {
-            match op {
-                "tokens" => { operations.push(Operation::Tokens); col_names.push(name.as_bytes().to_vec()) },
-                "counts" => { operations.push(Operation::Counts); col_names.push(name.as_bytes().to_vec()); }
-                "fits" => { operations.push(Operation::Fits); col_names.push(name.as_bytes().to_vec()); },
-                _ => Err("--emit did not receive a correct format (i.e. 'tokens,counts,fits' or less options)" )?,
-            }
-        }
-    } else {
-        for op in emit_ops {
-            match op {
-                "tokens" => { operations.push(Operation::Tokens);
-                    if !args.explode { col_names.push(b"tokens".to_vec()) } else { col_names.push(b"token".to_vec()); }},
-                "counts" => { operations.push(Operation::Counts); col_names.push(b"token_count".to_vec()); }
-                "fits" => { operations.push(Operation::Fits); col_names.push(b"fits".to_vec()); },
-                _ => Err("--emit did not receive a correct format (i.e. 'tokens,counts,fits' or less options)" )?,
-            }
-        }
+    if args.emit.len() != col_names.len() {
+        Err(format!(
+            "--emit ({}) and --column-names ({}) don't have the same number of elements!",
+            args.emit.len(),
+            col_names.len()
+        ))?;
     }
-
-    args.parallelization.build_rayon_global_thread_pool();
 
     let tokenizer = args.model.tokenizer()?;
 
@@ -165,12 +192,7 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
     let mut writer = io::Output::new(&args.output).csv_writer()?;
 
     if reader.has_headers() {
-        let mut new_headers: ByteRecord = out_sel.select(&headers).collect();
-        for name in col_names {
-            new_headers.push_field(&name);
-        }
-
-        writer.write_byte_record(&new_headers)?;
+        writer.write_record(out_sel.select(&headers).chain(&col_names))?;
     }
 
     let mut records = Vec::new();
@@ -196,23 +218,33 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
                 for token in tokens {
                     record.truncate(out_sel.len());
 
-                    for operation in &operations {
+                    for operation in &args.emit {
                         match operation {
                             Operation::Tokens => record.push_field(token.as_bytes()),
                             Operation::Counts => record.fmt_field(&tokens.len()),
-                            Operation::Fits => record.push_field(if tokens.len() < args.model.max_length
-                                                        { b"true" } else { b"false" }),
+                            Operation::Fits => {
+                                record.push_field(if tokens.len() < args.model.max_length {
+                                    b"true"
+                                } else {
+                                    b"false"
+                                })
+                            }
                         }
                     }
                     writer.write_byte_record(record)?;
                 }
             } else {
-                for operation in &operations {
+                for operation in &args.emit {
                     match operation {
                         Operation::Tokens => record.push_field(tokens.join(&args.sep).as_bytes()),
                         Operation::Counts => record.fmt_field(&tokens.len()),
-                        Operation::Fits => record.push_field(if tokens.len() < args.model.max_length
-                                                    { "true".as_bytes() } else { "false".as_bytes() }),
+                        Operation::Fits => {
+                            record.push_field(if tokens.len() < args.model.max_length {
+                                b"true"
+                            } else {
+                                b"false"
+                            })
+                        }
                     }
                 }
                 writer.write_byte_record(record)?;

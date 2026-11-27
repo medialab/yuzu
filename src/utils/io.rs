@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use npyz::WriterBuilder;
-extern crate npyz;
+use simd_csv::{ByteRecord, ReaderBuilder};
 
 use crate::utils::writers;
 
@@ -84,6 +84,37 @@ impl FromStr for Delimiter {
                     Err(msg)
                 }
             }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CsvNames {
+    record: ByteRecord,
+}
+
+impl CsvNames {
+    pub fn into_record(self) -> ByteRecord {
+        self.record
+    }
+
+    pub fn as_record(&self) -> &ByteRecord {
+        &self.record
+    }
+}
+
+impl FromStr for CsvNames {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let reader = ReaderBuilder::new()
+            .has_headers(false)
+            .from_reader(s.as_bytes());
+
+        if let Some(Ok(record)) = reader.into_byte_records().next() {
+            Ok(Self { record })
+        } else {
+            Err(format!("could not parse \"{s}\" as CSV names!"))
         }
     }
 }

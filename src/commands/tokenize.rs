@@ -1,14 +1,53 @@
 use std::num::NonZeroUsize;
 use std::ops::Range;
-use std::str::from_utf8;
+use std::str::{FromStr, from_utf8};
 
 use clap::Args;
 use simd_csv::{ByteRecord, Selection, Selector};
 use tokenizers::{Encoding, PaddingDirection};
 
 use crate::utils::hf::{DEFAULT_MODEL, EmbeddingModel, print_models_list};
-use crate::utils::{io, iter::IteratorExt};
+use crate::utils::{
+    io::{self, CsvNames},
+    iter::IteratorExt,
+};
 use crate::{CLIResult, CommonArgs, ParallelizationArgs};
+
+#[derive(Debug, Clone)]
+enum Operation {
+    Tokens,
+    Counts,
+    Fits,
+}
+
+impl Operation {
+    fn as_column_name(&self, plural: bool) -> &[u8] {
+        match self {
+            Self::Tokens => {
+                if plural {
+                    b"tokens"
+                } else {
+                    b"token"
+                }
+            }
+            Self::Counts => b"token_count",
+            Self::Fits => b"fits",
+        }
+    }
+}
+
+impl FromStr for Operation {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "token" | "tokens" => Self::Tokens,
+            "count" | "counts" | "token_count" => Self::Counts,
+            "fits" => Self::Fits,
+            _ => return Err(format!("unknown --emit type {s}")),
+        })
+    }
+}
 
 #[inline]
 fn unpadded_range(encoding: &Encoding, direction: PaddingDirection) -> Range<usize> {
@@ -33,8 +72,6 @@ fn unpadded_range(encoding: &Encoding, direction: PaddingDirection) -> Range<usi
         }
     }
 }
-
-const COUNTS_HEADER: &str = "Count Tokens Options";
 
 #[derive(Args, Debug)]
 pub struct TokenizeArgs {
@@ -64,40 +101,30 @@ pub struct TokenizeArgs {
     #[arg(long, default_value = "32", value_name = "n")]
     chunk_size: NonZeroUsize,
 
+    /// Columns, separated by commas, that the tokenization process should emit:
+    ///     - "tokens": tokens joined by spaces or by what was given to --sep
+    ///                 or a single token when using --explode.
+    ///     - "count":  number of tokens
+    ///     - "fits":   whether the number of tokens fits in the model's context
+    ///                 window.
+    #[arg(
+        short,
+        long,
+        default_value = "tokens",
+        value_delimiter = ',',
+        verbatim_doc_comment
+    )]
+    emit: Vec<Operation>,
+
+    /// Csv-separable column names. Must be aligned with --emit. Will take sensible defaults.
+    /// (i.e. token(s), token_count, and/or fits depending on the options requested).
+    #[arg(short, long)]
+    column_names: Option<CsvNames>,
+
     /// If given, "explode" the output by priting a copy of the record per token. This can be
-    /// useful to compute aggregation at the token level. Cannot be used with --count nor --fits
-    /// nor --keep-tokenized.
+    /// useful to compute aggregation at the token level.
     #[arg(long)]
     explode: bool,
-
-    /// Name of the token column to append. Defaults to "tokens", or "token" when used with --explode.
-    #[arg(long, value_name = "name")]
-    token_column: Option<String>,
-
-    /// If given, will count the number of tokens instead. Cannot be used with --explode nor --fits.
-    /// --keep will be automatically set to true.
-    #[arg(long, help_heading = COUNTS_HEADER)]
-    count: bool,
-
-    /// Used with --counts. Name of the column to append the result of --counts.
-    #[arg(short, long,
-        value_name = "name",
-        help_heading = COUNTS_HEADER)]
-    count_column: Option<String>,
-
-    /// If given, will display a boolean indicating whether the number of tokens fits
-    /// in the chosen model's context window. Cannot be used with --explode nor --count.
-    /// --keep will be automatically set to true.
-    #[arg(long, help_heading = COUNTS_HEADER)]
-    fits: bool,
-
-    /// Used with --fits. Name of the column to append the result of --fits.
-    #[arg(short, long, value_name = "name", help_heading = COUNTS_HEADER)]
-    fits_column: Option<String>,
-
-    /// Whether to keep the tokenized column.
-    #[arg(long, help_heading = COUNTS_HEADER)]
-    keep_tokenized: bool,
 
     /// Separator to use when joining the tokens in the output. The default space character used to
     /// do so is usually safe since most models normalize spaces in the tokens for easier debugging.
@@ -120,43 +147,30 @@ pub struct TokenizeArgs {
     common: CommonArgs,
 }
 
-pub fn action(args: TokenizeArgs) -> CLIResult<()> {
-    if args.explode {
-        if args.count {
-            Err("--count is not compatible with --explode!")?;
-        }
-        if args.fits {
-            Err("--fits is not compatible with --explode!")?;
-        }
-        if args.keep_tokenized {
-            Err("Cannot keep original tokenized column if using --explode!")?;
-        }
-    }
-
-    if !args.count && args.count_column.is_some() {
-        Err("--count-column have to be used with --count!")?;
-    }
-
-    if !args.fits && args.fits_column.is_some() {
-        Err("--fits-column have to be used with --fits!")?;
-    }
-
+pub fn action(mut args: TokenizeArgs) -> CLIResult<()> {
     if args.list_models {
         print_models_list();
         return Ok(());
     }
 
-    let have_tokens_col = !(args.count || args.fits) || args.keep_tokenized;
+    let col_names = args
+        .column_names
+        .take()
+        .map(CsvNames::into_record)
+        .unwrap_or_else(|| {
+            args.emit
+                .iter()
+                .map(|op| op.as_column_name(!args.explode))
+                .collect()
+        });
 
-    // !have_tokens_col -> !explode because (count || fits) -> !explode
-    if !have_tokens_col && args.token_column.is_some() {
-        Err(concat![
-            "You didn't ask to keep tokenized column but still gave it a name!",
-            "Maybe you forgot --keep-tokenized?"
-        ])?;
+    if args.emit.len() != col_names.len() {
+        Err(format!(
+            "--emit ({}) and --column-names ({}) don't have the same number of elements!",
+            args.emit.len(),
+            col_names.len()
+        ))?;
     }
-
-    args.parallelization.build_rayon_global_thread_pool();
 
     let tokenizer = args.model.tokenizer()?;
 
@@ -178,31 +192,7 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
     let mut writer = io::Output::new(&args.output).csv_writer()?;
 
     if reader.has_headers() {
-        let mut new_headers: ByteRecord = out_sel.select(&headers).collect();
-
-        let mut push_column_name_or = |token_column: Option<String>, default| {
-            new_headers.push_field(
-                token_column
-                    .as_ref()
-                    .map_or(default, |name| name.as_bytes()),
-            )
-        };
-
-        if args.explode {
-            push_column_name_or(args.token_column, &b"token"[..]);
-        } else {
-            if have_tokens_col {
-                push_column_name_or(args.token_column, &b"tokens"[..]);
-            }
-            if args.count {
-                push_column_name_or(args.count_column, &b"token_count"[..]);
-            }
-            if args.fits {
-                push_column_name_or(args.fits_column, &b"fits"[..]);
-            }
-        }
-
-        writer.write_byte_record(&new_headers)?;
+        writer.write_record(out_sel.select(&headers).chain(&col_names))?;
     }
 
     let mut records = Vec::new();
@@ -227,25 +217,36 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
             if args.explode {
                 for token in tokens {
                     record.truncate(out_sel.len());
-                    record.push_field(token.as_bytes());
 
+                    for operation in &args.emit {
+                        match operation {
+                            Operation::Tokens => record.push_field(token.as_bytes()),
+                            Operation::Counts => record.fmt_field(&tokens.len()),
+                            Operation::Fits => {
+                                record.push_field(if tokens.len() < args.model.max_length {
+                                    b"true"
+                                } else {
+                                    b"false"
+                                })
+                            }
+                        }
+                    }
                     writer.write_byte_record(record)?;
                 }
             } else {
-                if have_tokens_col {
-                    record.push_field(tokens.join(&args.sep).as_bytes());
+                for operation in &args.emit {
+                    match operation {
+                        Operation::Tokens => record.push_field(tokens.join(&args.sep).as_bytes()),
+                        Operation::Counts => record.fmt_field(&tokens.len()),
+                        Operation::Fits => {
+                            record.push_field(if tokens.len() < args.model.max_length {
+                                b"true"
+                            } else {
+                                b"false"
+                            })
+                        }
+                    }
                 }
-                if args.count {
-                    record.fmt_field(&tokens.len());
-                }
-                if args.fits {
-                    record.push_field(if tokens.len() < args.model.max_length {
-                        "true".as_bytes()
-                    } else {
-                        "false".as_bytes()
-                    });
-                }
-
                 writer.write_byte_record(record)?;
             }
         }

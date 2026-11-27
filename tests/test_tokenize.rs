@@ -49,7 +49,7 @@ fn tokenize_count() {
         .arg("tokenize")
         .arg("sentence")
         .args(["--model", "test-model"])
-        .arg("--count")
+        .args(["--emit", "counts"])
         .write_csv_stdin(&[
             &["sentence"],
             &["Say hello to my little friend!"],
@@ -64,7 +64,7 @@ fn tokenize_fits() {
         .arg("tokenize")
         .arg("sentence")
         .args(["--model", "test-model"])
-        .arg("--fits")
+        .args(["--emit", "fits"])
         .write_csv_stdin(&[
             &["sentence"],
             &["Say hello to my little friend!"],
@@ -86,7 +86,7 @@ fn tokenize_column() {
         .arg("tokenize")
         .arg("sentence")
         .args(["--model", "test-model"])
-        .arg("--count")
+        .args(["--emit", "counts"])
         .args(["-c", "count"])
         .write_csv_stdin(&[
             &["sentence"],

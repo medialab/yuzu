@@ -13,7 +13,6 @@ use crate::{CLIResult, CommonArgs, ParallelizationArgs};
 #[derive(Debug, Clone)]
 enum Operation {
     Tokens,
-    Explode,
     Counts,
     Fits
 }
@@ -77,7 +76,7 @@ pub struct TokenizeArgs {
     emit: String,
 
     /// Csv-separable column names. Must be aligned with --emit. Will take sensible defaults.
-    /// (i.e. tokens, counts, and/or fits depending on the options requested).
+    /// (i.e. token(s), token_count, and/or fits depending on the options requested).
     #[arg(short, long)]
     column_names: Option<String>,
 
@@ -86,11 +85,6 @@ pub struct TokenizeArgs {
     /// nor --keep-tokenized.
     #[arg(long)]
     explode: bool,
-
-    /// csv-separable column names. Must be aligned with --emit and would take sensible defaults.
-    /// (i.e. "tokens", "count", and/or "fits" depending on those requested).
-    #[arg(long, default_value = "token")]
-    explode_name: String,
 
     /// Separator to use when joining the tokens in the output. The default space character used to
     /// do so is usually safe since most models normalize spaces in the tokens for easier debugging.
@@ -131,8 +125,7 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
 
         for (op, name) in emit_ops.zip(names) {
             match op {
-                "tokens" => if !args.explode { operations.push(Operation::Tokens); col_names.push(name.as_bytes().to_vec()) }
-                            else { operations.push(Operation::Explode); col_names.push(args.explode_name.as_bytes().to_vec()) },
+                "tokens" => { operations.push(Operation::Tokens); col_names.push(name.as_bytes().to_vec()) },
                 "counts" => { operations.push(Operation::Counts); col_names.push(name.as_bytes().to_vec()); }
                 "fits" => { operations.push(Operation::Fits); col_names.push(name.as_bytes().to_vec()); },
                 _ => Err("--emit did not receive a correct format (i.e. 'tokens,counts,fits' or less options)" )?,
@@ -141,9 +134,9 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
     } else {
         for op in emit_ops {
             match op {
-                "tokens" => if !args.explode { operations.push(Operation::Tokens); col_names.push(b"tokens".to_vec()) }
-                            else { operations.push(Operation::Explode); col_names.push(args.explode_name.as_bytes().to_vec()) },
-                "counts" => { operations.push(Operation::Counts); col_names.push(b"counts".to_vec()); }
+                "tokens" => { operations.push(Operation::Tokens);
+                    if !args.explode { col_names.push(b"tokens".to_vec()) } else { col_names.push(b"token".to_vec()); }},
+                "counts" => { operations.push(Operation::Counts); col_names.push(b"token_count".to_vec()); }
                 "fits" => { operations.push(Operation::Fits); col_names.push(b"fits".to_vec()); },
                 _ => Err("--emit did not receive a correct format (i.e. 'tokens,counts,fits' or less options)" )?,
             }
@@ -199,19 +192,31 @@ pub fn action(args: TokenizeArgs) -> CLIResult<()> {
             let tokens =
                 &encoding.get_tokens()[unpadded_range(&encoding, args.model.padding_direction)];
 
-            for operation in &operations {
-                match operation {
-                    Operation::Tokens => record.push_field(tokens.join(&args.sep).as_bytes()),
-                    Operation::Counts => record.fmt_field(&tokens.len()),
-                    Operation::Fits => record.push_field(if tokens.len() < args.model.max_length
-                                                { "true".as_bytes() } else { "false".as_bytes() }),
-                    Operation::Explode => for token in tokens {
-                        record.truncate(out_sel.len());
-                        record.push_field(token.as_bytes());
+            if args.explode {
+                for token in tokens {
+                    record.truncate(out_sel.len());
+
+                    for operation in &operations {
+                        match operation {
+                            Operation::Tokens => record.push_field(token.as_bytes()),
+                            Operation::Counts => record.fmt_field(&tokens.len()),
+                            Operation::Fits => record.push_field(if tokens.len() < args.model.max_length
+                                                        { b"true" } else { b"false" }),
+                        }
+                    }
+                    writer.write_byte_record(record)?;
+                }
+            } else {
+                for operation in &operations {
+                    match operation {
+                        Operation::Tokens => record.push_field(tokens.join(&args.sep).as_bytes()),
+                        Operation::Counts => record.fmt_field(&tokens.len()),
+                        Operation::Fits => record.push_field(if tokens.len() < args.model.max_length
+                                                    { "true".as_bytes() } else { "false".as_bytes() }),
                     }
                 }
+                writer.write_byte_record(record)?;
             }
-            writer.write_byte_record(record)?;
         }
     }
 
